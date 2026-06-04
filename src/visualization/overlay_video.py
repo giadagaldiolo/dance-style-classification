@@ -8,6 +8,7 @@ VIDEO_FILE = "videos/gBR_sBM_c01_d04_mBR0_ch01.mp4"
 PKL_FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
 
 OUTPUT_DIR = "outputs/overlays"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 base_name = os.path.splitext(os.path.basename(VIDEO_FILE))[0]
 OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
 

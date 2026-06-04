@@ -7,6 +7,7 @@ from matplotlib.animation import FuncAnimation
 FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
 CAMERA = 0
 OUTPUT_DIR = "outputs/animations"
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 base_name = os.path.splitext(os.path.basename(FILE))[0]
 OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
 _COLORS = [
