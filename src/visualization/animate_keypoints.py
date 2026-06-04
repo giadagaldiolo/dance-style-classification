@@ -76,8 +76,7 @@ def main():
         fig,
         update,
         frames=num_frames,
-        interval=1000/60,
-        BLIT=True
+        interval=1000/60
     )
 
     anim.save(

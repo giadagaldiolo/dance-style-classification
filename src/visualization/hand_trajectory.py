@@ -5,10 +5,14 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
-CAMERA = 0
 OUTPUT_DIR = "outputs/trajectories"
 base_name = os.path.splitext(os.path.basename(FILE))[0]
 OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
+
+CAMERA = 0
+ID = 10 # punto da tracciare
+TRAIL_LENGTH = 50 
+
 _COLORS = [
     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0],
     [170, 255, 0], [85, 255, 0], [0, 255, 0], [0, 255, 85],
@@ -26,6 +30,7 @@ SKELETON = [
     (12,14), (14,16)
 ]
 
+
 def load_data(path):
     with open(path, "rb") as f:
         return pickle.load(f)
@@ -41,11 +46,10 @@ def main():
     ax.set_ylim(1080, 0)
     ax.set_title("Hand trajectory + keypoints")
 
-
-    wrist_id = 10
     traj_x, traj_y = [], []
 
     def update(frame):
+        ax.clear()
         ax.set_xlim(0, 1920)
         ax.set_ylim(1080, 0)
 
@@ -73,10 +77,19 @@ def main():
                 linewidth=1
             )
 
-        traj_x.append(x[wrist_id])
-        traj_y.append(y[wrist_id])
+        traj_x.append(x[ID])
+        traj_y.append(y[ID])
 
-        ax.plot(traj_x, traj_y, linewidth=2, color="red")
+        if len(traj_x) > TRAIL_LENGTH:
+            traj_x.pop(0)
+            traj_y.pop(0)
+
+        ax.plot(
+            traj_x,
+            traj_y,
+            linewidth=2,
+            color="red"
+        )
 
         ax.set_title(f"Frame {frame}")
 
@@ -84,8 +97,7 @@ def main():
         fig,
         update,
         frames=num_frames,
-        interval=1000/60,
-        BLIT=True
+        interval=1000/60
     )
 
     anim.save(
