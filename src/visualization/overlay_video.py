@@ -6,8 +6,9 @@ from matplotlib.animation import FuncAnimation
 import ffmpeg
 
 
-VIDEO_FILE = "videos/gBR_sBM_c01_d04_mBR0_ch01.mp4"
-PKL_FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
+VIDEO_FILE = "downloaded_videos/break_1.mp4"
+# PKL_FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
+PKL_FILE = "outputs/keypoints/break_1.pkl"
 
 OUTPUT_DIR = "outputs/overlays"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -16,7 +17,6 @@ OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
 
 CACHE_VIDEO = VIDEO_FILE.replace(".mp4", ".npy")
 
-FPS = 60
 CAMERA = 0
 ID = 10
 TRAIL_LENGTH = 50
@@ -43,13 +43,7 @@ def load_data(path):
     with open(path, "rb") as f:
         return pickle.load(f)
 
-def ffmpeg_video_read(video_path, fps=60):
-    probe = ffmpeg.probe(video_path)
-    info = next(s for s in probe["streams"] if s["codec_type"] == "video")
-
-    w = int(info["width"])
-    h = int(info["height"])
-
+def ffmpeg_video_read(video_path, fps, w, h):
     stream = ffmpeg.input(video_path)
     stream = ffmpeg.filter(stream, "fps", fps=fps, round="down")
     stream = ffmpeg.output(stream, "pipe:", format="rawvideo", pix_fmt="rgb24")
@@ -57,20 +51,20 @@ def ffmpeg_video_read(video_path, fps=60):
     out, _ = ffmpeg.run(stream, capture_stdout=True)
 
     video = np.frombuffer(out, np.uint8).reshape([-1, h, w, 3])
-    return video, w, h
+    return video
 
-def load_video():
+def load_video(fps, w, h):
     if os.path.exists(CACHE_VIDEO):
-        print("Loading cached video...")
+        print("Loading cached video")
         video = np.load(CACHE_VIDEO)
-        return video, video.shape[2], video.shape[1]
+        return video
 
-    print("Reading video with ffmpeg (first time only)...")
-    video, w, h = ffmpeg_video_read(VIDEO_FILE, fps=FPS)
+    print("Reading video with ffmpeg")
+    video= ffmpeg_video_read(VIDEO_FILE, fps=fps, w=w, h=h)
 
     np.save(CACHE_VIDEO, video)
 
-    return video, w, h
+    return video
 
 def main():
 
@@ -79,7 +73,11 @@ def main():
     keypoints = data["keypoints2d"][CAMERA]
     timestamps = data["timestamps"]
 
-    video, W, H = load_video()
+    W = data["width"]
+    H = data["height"]
+    FPS = data["fps"]
+
+    video = load_video(FPS, W, H)
 
     fig, ax = plt.subplots(figsize=(19.2, 10.8), dpi=100)
 
@@ -95,9 +93,11 @@ def main():
         ax.set_xlim(0, W)
         ax.set_ylim(H, 0)
         ax.set_aspect("equal")
-        t = (timestamps[i] / 1_000_000) - (timestamps[0] / 1_000_000)
-        vf = int((t + VIDEO_START_TIME) * FPS)
-
+        
+        # t = (timestamps[i] / 1_000_000) - (timestamps[0] / 1_000_000)
+        # vf = int((t + VIDEO_START_TIME) * FPS)
+        t = timestamps[i] / 1_000_000
+        vf = int(t * FPS)
         if vf < 0 or vf >= len(video):
             return []
 
@@ -115,7 +115,7 @@ def main():
                 ax.scatter(
                     x[j], 
                     y[j],
-                    s=12,
+                    s=150,
                     color=np.array(_COLORS[j]) / 255.0
                 )
 
@@ -155,7 +155,7 @@ def main():
         fig,
         update,
         frames=len(keypoints),
-        interval=1000/60
+        interval=1000/FPS
     )
 
     anim.save(

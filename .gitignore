@@ -1,8 +1,9 @@
 # Dataset AIST++
 annotations/
 
-# Video originali
+# Video 
 videos/
+downloaded_videos/
 
 # Output generati dagli script
 outputs/

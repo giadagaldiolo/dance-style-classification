@@ -4,7 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
+# FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
+FILE = "outputs/keypoints/break_1.pkl"
 OUTPUT_DIR = "outputs/trajectories"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 base_name = os.path.splitext(os.path.basename(FILE))[0]
@@ -41,10 +42,14 @@ def main():
     keypoints = data["keypoints2d"][CAMERA]  # (T, 17, 3)
     num_frames = len(keypoints)
 
+    W = data["width"]
+    H = data["height"]
+    fps = data["fps"]
+
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    ax.set_xlim(0, 1920)
-    ax.set_ylim(1080, 0)
+    ax.set_xlim(0, W)
+    ax.set_ylim(H, 0)
     ax.set_aspect("equal")
     ax.set_title("Hand trajectory + keypoints")
 
@@ -52,12 +57,12 @@ def main():
 
     def update(frame):
         ax.clear()
-        ax.set_xlim(0, 1920)
-        ax.set_ylim(1080, 0)
+        ax.set_xlim(0, W)
+        ax.set_ylim(H, 0)
         ax.set_aspect("equal")
 
-        ax.set_xticks(np.arange(0, 1921, 200))
-        ax.set_yticks(np.arange(0, 1081, 200))  
+        ax.set_xticks(np.arange(0, W + 1, 200))
+        ax.set_yticks(np.arange(0, H + 1, 200))  
 
         kp = keypoints[frame]
 
@@ -105,13 +110,13 @@ def main():
         fig,
         update,
         frames=num_frames,
-        interval=1000/60
+        interval=1000/fps
     )
 
     anim.save(
         OUTPUT_VIDEO,
         writer="ffmpeg",
-        fps=60
+        fps=fps
     )
 
 
