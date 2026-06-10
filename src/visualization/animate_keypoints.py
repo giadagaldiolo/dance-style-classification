@@ -40,37 +40,42 @@ def main():
 
     ax.set_xlim(0, 1920)
     ax.set_ylim(1080, 0)
-    ax.set_title("Hand trajectory + keypoints")
+    ax.set_aspect("equal")
+    ax.set_title("Animation of Keypoints")
 
 
     def update(frame):
+        ax.clear()
         ax.set_xlim(0, 1920)
         ax.set_ylim(1080, 0)
+        ax.set_aspect("equal")
 
+        ax.set_xticks(np.arange(0, 1921, 200))
+        ax.set_yticks(np.arange(0, 1081, 200))
+        
         kp = keypoints[frame]
 
-        x = kp[:, 0]
-        y = kp[:, 1]
+        x = kp[:, 0] 
+        y = kp[:, 1] 
 
         for i in range(17):
-            ax.scatter(
-                x[i],
-                y[i],
-                s=12, 
-                color=np.array(_COLORS[i]) / 255.0
-            )
+            if not np.isnan(x[i]) and not np.isnan(y[i]):
+                ax.scatter(
+                    x[i],
+                    y[i],
+                    s=12, 
+                    color=np.array(_COLORS[i]) / 255.0
+                )
 
         for a, b in SKELETON:
             if np.isnan(x[a]) or np.isnan(x[b]):
                 continue
-
             ax.plot(
                 [x[a], x[b]],
                 [y[a], y[b]],
                 color="black",
                 linewidth=1
             )
-
         ax.set_title(f"Frame {frame}")
 
     anim = FuncAnimation(

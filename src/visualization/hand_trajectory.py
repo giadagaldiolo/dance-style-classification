@@ -45,6 +45,7 @@ def main():
 
     ax.set_xlim(0, 1920)
     ax.set_ylim(1080, 0)
+    ax.set_aspect("equal")
     ax.set_title("Hand trajectory + keypoints")
 
     traj_x, traj_y = [], []
@@ -53,6 +54,10 @@ def main():
         ax.clear()
         ax.set_xlim(0, 1920)
         ax.set_ylim(1080, 0)
+        ax.set_aspect("equal")
+
+        ax.set_xticks(np.arange(0, 1921, 200))
+        ax.set_yticks(np.arange(0, 1081, 200))  
 
         kp = keypoints[frame]
 
@@ -60,37 +65,39 @@ def main():
         y = kp[:, 1]
 
         for i in range(17):
-            ax.scatter(
-                x[i],
-                y[i],
-                s=12, 
-                color=np.array(_COLORS[i]) / 255.0
-            )
+            if not np.isnan(x[i]) and not np.isnan(y[i]):
+                ax.scatter(
+                    x[i],
+                    y[i],
+                    s=12, 
+                    color=np.array(_COLORS[i]) / 255.0
+                )
 
         for a, b in SKELETON:
             if np.isnan(x[a]) or np.isnan(x[b]):
                 continue
-
             ax.plot(
                 [x[a], x[b]],
                 [y[a], y[b]],
                 color="black",
                 linewidth=1
             )
+            
+        if not np.isnan(x[ID]) and not np.isnan(y[ID]):
+            traj_x.append(x[ID])
+            traj_y.append(y[ID])
 
-        traj_x.append(x[ID])
-        traj_y.append(y[ID])
+            if len(traj_x) > TRAIL_LENGTH:
+                traj_x.pop(0)
+                traj_y.pop(0)
 
-        if len(traj_x) > TRAIL_LENGTH:
-            traj_x.pop(0)
-            traj_y.pop(0)
-
-        ax.plot(
-            traj_x,
-            traj_y,
-            linewidth=2,
-            color="red"
-        )
+        if len(traj_x) > 1:
+            ax.plot(
+                traj_x,
+                traj_y,
+                color="red",
+                linewidth=2
+            )
 
         ax.set_title(f"Frame {frame}")
 

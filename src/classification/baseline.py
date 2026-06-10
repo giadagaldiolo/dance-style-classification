@@ -93,10 +93,6 @@ def main():
     os.makedirs(os.path.dirname(DATASET), exist_ok=True)
     df.to_csv(DATASET, index=False)
 
-    print(df.head())
-    print()
-    print("Samples:", len(df))
-    print("Saved:", DATASET)
 
     train_model()
 
