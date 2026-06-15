@@ -7,7 +7,7 @@ from mmpose.apis import MMPoseInferencer
 
 
 # VIDEO_PATH = "videos/gBR_sBM_c01_d04_mBR0_ch01.mp4"
-VIDEO_PATH = "downloaded_videos/break_1.mp4"
+VIDEO_PATH = "downloaded_videos/hiphop_2.mp4"
 
 OUTPUT_DIR = "outputs/keypoints"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

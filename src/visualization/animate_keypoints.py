@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 # FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
-FILE = "outputs/keypoints/break_1.pkl"
+FILE = "outputs/keypoints/hiphop_2.pkl"
 CAMERA = 0
 OUTPUT_DIR = "outputs/animations"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

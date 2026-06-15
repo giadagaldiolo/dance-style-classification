@@ -6,9 +6,9 @@ from matplotlib.animation import FuncAnimation
 import ffmpeg
 
 
-VIDEO_FILE = "downloaded_videos/break_1.mp4"
+VIDEO_FILE = "downloaded_videos/hiphop_2.mp4"
 # PKL_FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
-PKL_FILE = "outputs/keypoints/break_1.pkl"
+PKL_FILE = "outputs/keypoints/hiphop_2.pkl"
 
 OUTPUT_DIR = "outputs/overlays"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -96,6 +96,7 @@ def main():
         
         # t = (timestamps[i] / 1_000_000) - (timestamps[0] / 1_000_000)
         # vf = int((t + VIDEO_START_TIME) * FPS)
+        
         t = timestamps[i] / 1_000_000
         vf = int(t * FPS)
         if vf < 0 or vf >= len(video):
@@ -147,7 +148,7 @@ def main():
             )
 
         ax.set_title(f"Frame {i}")
-        ax.axis("off")
+        ax.axis("off") 
 
         return []
 
