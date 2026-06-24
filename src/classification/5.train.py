@@ -5,60 +5,85 @@ import pandas as pd
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, auc,classification_report,confusion_matrix, f1_score)
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import f1_score
+import joblib
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
-from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 
 KEYPOINT_DIR = "annotations/keypoints2d"
-DATASET = "outputs/classification/binary_classification.csv"
+DATASET = "outputs/classification/multiclass_classification.csv"
+MODEL_PATH = "outputs/classification/rf_model.pkl"
+
 os.makedirs(os.path.dirname(DATASET), exist_ok=True)
 CLASSES = [
-    "gHO", 
-    "gLH",
+    "gBR", "gHO", "gJB", "gJS", "gKR",
+    "gLH", "gLO", "gMH", "gPO", "gWA"
 ]
-ID = 10  # right wrist
+JOINTS = [
+    5, 6,   # shoulders
+    7, 8,   # elbows
+    9, 10,  # wrists
+    11, 12  # hips
+]
+
 
 def extract_features(keypoints):
-    hand = keypoints[:, ID, :2]
+    selected = keypoints[:, JOINTS, :2]
 
-    x = hand[:, 0]
-    y = hand[:, 1]
+    x = selected[:, :, 0]
+    y = selected[:, :, 1]
 
     valid = ~(np.isnan(x) | np.isnan(y))
 
-    x = x[valid]
-    y = y[valid]
-
-    if len(x) == 0:
+    if np.sum(valid) == 0:
         return None
 
-    features = {
-        "mean_x": np.mean(x),
-        "mean_y": np.mean(y),
+    features = {}
 
-        "std_x": np.std(x),
-        "std_y": np.std(y),
+    for j in range(len(JOINTS)):
+        xj = x[:, j][valid[:, j]]
+        yj = y[:, j][valid[:, j]]
 
-        "min_x": np.min(x),
-        "max_x": np.max(x),
+        if len(xj) == 0:
+            continue
 
-        "min_y": np.min(y),
-        "max_y": np.max(y),
+        features[f"mean_x_{j}"] = np.mean(xj)
+        features[f"mean_y_{j}"] = np.mean(yj)
 
-        "range_x": np.max(x) - np.min(x),
-        "range_y": np.max(y) - np.min(y),
-    }
+        features[f"std_x_{j}"] = np.std(xj)
+        features[f"std_y_{j}"] = np.std(yj)
+
+        features[f"min_x_{j}"] = np.min(xj)
+        features[f"max_x_{j}"] = np.max(xj)
+
+        features[f"range_x_{j}"] = np.max(xj) - np.min(xj)
+        features[f"range_y_{j}"] = np.max(yj) - np.min(yj)
 
     return features
 
 
 def get_label(filename):
-    if filename.startswith("gMH"):
-        return 0  # Middle Hip Hop
+    if filename.startswith("gBR"):
+        return 0
+    if filename.startswith("gHO"):
+        return 1
+    if filename.startswith("gJB"):
+        return 2
+    if filename.startswith("gJS"):
+        return 3
+    if filename.startswith("gKR"):
+        return 4
     if filename.startswith("gLH"):
-        return 1  # LA Hip Hop
+        return 5
+    if filename.startswith("gLO"):
+        return 6
+    if filename.startswith("gMH"):
+        return 7
+    if filename.startswith("gPO"):
+        return 8
+    if filename.startswith("gWA"):
+        return 9
     return None
 
 
@@ -66,7 +91,6 @@ def main():
     rows = []
 
     for filename in os.listdir(KEYPOINT_DIR):
-
         if not filename.endswith(".pkl"):
             continue
 
@@ -81,7 +105,6 @@ def main():
             data = pickle.load(f)
 
         keypoints = data["keypoints2d"][0]
-
         features = extract_features(keypoints)
 
         if features is None:
@@ -93,17 +116,10 @@ def main():
         rows.append(features)
 
     df = pd.DataFrame(rows)
-
-    os.makedirs(os.path.dirname(DATASET), exist_ok=True)
     df.to_csv(DATASET, index=False)
-
-
     train_model()
 
-def load_split(path):
-    with open(path, "r") as f:
-        return [line.strip() for line in f.readlines()]
-    
+
 def train_model():
     df = pd.read_csv(DATASET)
     df["base_name"] = df["sequence"].str.split("_ch").str[0]
@@ -111,8 +127,8 @@ def train_model():
     coreografie_uniche = df["base_name"].unique()
 
     train_coreo, test_coreo = train_test_split(
-        coreografie_uniche,
-        test_size=0.2,
+        coreografie_uniche, 
+        test_size=0.2, 
         random_state=42
     )
 
@@ -129,19 +145,20 @@ def train_model():
     y_test = test_df["label"]
 
     clf = RandomForestClassifier(
-        n_estimators=200,
+        n_estimators=200, 
         random_state=42
+    
     )
-
     clf.fit(X_train, y_train)
 
+    joblib.dump(clf, MODEL_PATH)
+
     print("\nTEST RESULTS")
-    test_pred = clf.predict(X_test)
+    pred = clf.predict(X_test)
 
-    print("\nCLASSIFICATION REPORT")
-    print(classification_report(y_test, test_pred))
+    print(classification_report(y_test, pred))
 
-    cm = confusion_matrix(y_test, test_pred, labels=list(range(len(CLASSES))))
+    cm = confusion_matrix(y_test, pred, labels=list(range(len(CLASSES))))
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm,
         display_labels=CLASSES
@@ -152,10 +169,7 @@ def train_model():
     plt.tight_layout()
     plt.show()
 
-    y_proba = clf.predict_proba(X_test)[:, 1]
-    auc = roc_auc_score(y_test, y_proba)
-    print("AUC:", auc)
-    print("Macro F1:", f1_score(y_test, test_pred, average="macro"))
+    print("Macro F1:", f1_score(y_test, pred, average="macro"))
 
 
 if __name__ == "__main__":
