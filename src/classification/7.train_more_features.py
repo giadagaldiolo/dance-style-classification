@@ -94,23 +94,39 @@ def joint_speed_features(keypoints, joint_id, name, fps):
     return {f"{name}_speed_median": np.median(speed)}
 
 
-def forearm_angle(keypoints, shoulder_id, elbow_id, wrist_id):
+def forearm_angle(keypoints, shoulder_id, elbow_id, wrist_id, side):
     shoulder = keypoints[:, shoulder_id, :2]
     elbow = keypoints[:, elbow_id, :2]
     wrist = keypoints[:, wrist_id, :2]
 
-    upper_arm = elbow - shoulder
+    upper_arm = shoulder - elbow
     forearm = wrist - elbow
 
-    angle_upper = np.degrees(
+    upper_angle = np.degrees(
         np.arctan2(upper_arm[:, 1], upper_arm[:, 0])
     )
 
-    angle_forearm = np.degrees(
+    forearm_angle = np.degrees(
         np.arctan2(forearm[:, 1], forearm[:, 0])
     )
 
-    angle = (angle_forearm - angle_upper + 360) % 360
+    if side == "left":
+        # braccio sinistro: senso orario
+        angle = (forearm_angle - upper_angle + 360) % 360
+
+    elif side == "right":
+        # braccio destro: senso antiorario
+        angle = (upper_angle - forearm_angle + 360) % 360
+
+   
+    invalid = (
+        np.isnan(upper_angle[:, 0]) |
+        np.isnan(upper_angle[:, 1]) |
+        np.isnan(forearm_angle[:, 0]) |
+        np.isnan(forearm_angle[:, 1])
+    )
+
+    angle[invalid] = np.nan
 
     return angle
 
@@ -128,7 +144,6 @@ def angle_stats(angles, name, fps):
     diff = (diff + 180) % 360 - 180
 
     angular_speed = np.abs(diff) * fps
-
 
     return {f"{name}_angular_speed_median": np.median(angular_speed)}
 

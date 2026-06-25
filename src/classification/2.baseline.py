@@ -5,10 +5,9 @@ import pandas as pd
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, auc,classification_report,confusion_matrix, f1_score)
+from sklearn.metrics import (classification_report,confusion_matrix, f1_score)
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
-from sklearn.preprocessing import label_binarize
 import matplotlib.pyplot as plt
 
 KEYPOINT_DIR = "annotations/keypoints2d"
