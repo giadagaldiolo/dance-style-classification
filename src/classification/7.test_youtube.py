@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from sklearn.metrics import classification_report, confusion_matrix, f1_score, top_k_accuracy_score
 from sklearn.metrics import ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
@@ -298,6 +298,14 @@ def main():
     plt.tight_layout()
     plt.show()
 
+    proba = clf.predict_proba(df)
+    top3 = top_k_accuracy_score(
+        y,
+        proba,
+        k=3
+    )
+
+    print("Top-3 Accuracy:", top3)
     print("Macro F1:", f1_score(y, pred, average="macro"))
 
 

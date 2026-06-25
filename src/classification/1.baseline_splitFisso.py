@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, auc,classification_report,confusion_matrix)
+from sklearn.metrics import (accuracy_score, auc,classification_report,confusion_matrix, f1_score)
 from sklearn.metrics import roc_auc_score
 
 KEYPOINT_DIR = "annotations/keypoints2d"
@@ -149,6 +149,7 @@ def train_model():
     y_proba = clf.predict_proba(X_test)[:, 1]
     auc = roc_auc_score(y_test, y_proba)
     print("AUC:", auc)  
+    print("Macro F1:", f1_score(y_test, test_pred, average="macro"))
 
 
 if __name__ == "__main__":

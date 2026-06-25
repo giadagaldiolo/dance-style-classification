@@ -5,9 +5,8 @@ import pandas as pd
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (accuracy_score, auc,classification_report,confusion_matrix)
-from sklearn.metrics import roc_auc_score
-from sklearn.preprocessing import label_binarize
+from sklearn.metrics import (classification_report,confusion_matrix)
+from sklearn.metrics import top_k_accuracy_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
 import matplotlib.pyplot as plt
@@ -169,11 +168,14 @@ def train_model():
     plt.tight_layout()
     plt.show()
 
-    y_test_bin = label_binarize(y_test, classes=np.arange(10))
-    y_proba = clf.predict_proba(X_test)
+    proba = clf.predict_proba(X_test)
+    top3 = top_k_accuracy_score(
+        y_test,
+        proba,
+        k=3
+    )
 
-    auc = roc_auc_score(y_test_bin, y_proba, multi_class="ovr")
-    print("AUC:", auc)
+    print("Top-3 Accuracy:", top3)
     print("Macro F1:", f1_score(y_test, test_pred, average="macro"))
 
 

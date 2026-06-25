@@ -5,7 +5,7 @@ import pandas as pd
 
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, top_k_accuracy_score
 from sklearn.metrics import f1_score
 import joblib
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix
@@ -169,6 +169,14 @@ def train_model():
     plt.tight_layout()
     plt.show()
 
+    proba = clf.predict_proba(X_test)
+    top3 = top_k_accuracy_score(
+        y_test,
+        proba,
+        k=3
+    )
+
+    print("Top-3 Accuracy:", top3)
     print("Macro F1:", f1_score(y_test, pred, average="macro"))
 
 
