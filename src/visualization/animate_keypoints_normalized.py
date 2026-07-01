@@ -4,11 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-FILE = "annotations/keypoints2d/gWA_sMM_cAll_d27_mWA5_ch10.pkl"
-# FILE = "outputs/keypoints/gJS_yt_02.pkl"
+# FILE = "annotations/keypoints2d/gJB_sBM_cAll_d07_mJB0_ch01.pkl"
+FILE = "outputs/keypoints/gJS_yt_02.pkl"
+
 CAMERA = 0
 OUTPUT_DIR = "outputs/animations/normalized"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 base_name = os.path.splitext(os.path.basename(FILE))[0]
 OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
 
@@ -64,7 +66,6 @@ def normalize_keypoints(keypoints):
 
     return kp
 
-
 def main():
     data = load_data(FILE)
 
@@ -74,54 +75,90 @@ def main():
     num_frames = len(keypoints)
     fps = data.get("fps", 60)
 
+    x_all = keypoints[:, :, 0]
+    y_all = keypoints[:, :, 1]
+
+    xmin = np.nanmin(x_all) - 0.2
+    xmax = np.nanmax(x_all) + 0.2
+    ymin = np.nanmin(y_all) - 0.2
+    ymax = np.nanmax(y_all) + 0.2
+
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    ax.set_xlim(-1.5, 1.5)
-    ax.set_ylim(1.5, -1.5)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymax, ymin)
     ax.set_aspect("equal")
+    ax.set_xticks(np.arange(np.floor(xmin), np.ceil(xmax) + 0.5, 0.5))
+    ax.set_yticks(np.arange(np.floor(ymin), np.ceil(ymax) + 0.5, 0.5))
+
+    points = []
+    for i in range(17):
+        point = ax.scatter(
+            [],
+            [],
+            s=18,
+            color=np.array(_COLORS[i]) / 255.0
+        )
+        points.append(point)
+
+    lines = []
+    for _ in SKELETON:
+        line, = ax.plot(
+            [],
+            [],
+            color="black",
+            linewidth=1
+        )
+        lines.append(line)
+
+    title = ax.set_title("Normalized Keypoints - Frame 0")
+
+    def init():
+        for point in points:
+            point.set_offsets(np.empty((0, 2)))
+
+        for line in lines:
+            line.set_data([], [])
+
+        title.set_text("Normalized Keypoints - Frame 0")
+
+        return points + lines + [title]
 
     def update(frame):
-        ax.clear()
-
-        ax.set_xlim(-1.5, 1.5)
-        ax.set_ylim(1.5, -1.5)
-        ax.set_aspect("equal")
-
-        ax.set_xticks(np.arange(-1.5, 1.6, 0.5))
-        ax.set_yticks(np.arange(-1.5, 1.6, 0.5))
-
         kp = keypoints[frame]
 
         x = kp[:, 0]
         y = kp[:, 1]
 
-        for i in range(17):
-            if not np.isnan(x[i]) and not np.isnan(y[i]):
-                ax.scatter(
-                    x[i],
-                    y[i],
-                    s=18,
-                    color=np.array(_COLORS[i]) / 255.0
+        for i, point in enumerate(points):
+            if np.isnan(x[i]) or np.isnan(y[i]):
+                point.set_offsets(np.empty((0, 2)))
+            else:
+                point.set_offsets([[x[i], y[i]]])
+
+        for line, (a, b) in zip(lines, SKELETON):
+            if (
+                np.isnan(x[a]) or np.isnan(y[a]) or
+                np.isnan(x[b]) or np.isnan(y[b])
+            ):
+                line.set_data([], [])
+            else:
+                line.set_data(
+                    [x[a], x[b]],
+                    [y[a], y[b]]
                 )
 
-        for a, b in SKELETON:
-            if np.isnan(x[a]) or np.isnan(x[b]):
-                continue
+        title.set_text(f"Normalized Keypoints - Frame {frame}")
 
-            ax.plot(
-                [x[a], x[b]],
-                [y[a], y[b]],
-                color="black",
-                linewidth=1
-            )
-
-        ax.set_title(f"Normalized Keypoints - Frame {frame}")
+        return points + lines + [title]
 
     anim = FuncAnimation(
         fig,
         update,
+        init_func=init,
         frames=num_frames,
-        interval=1000 / fps
+        interval=1000 / fps,
+        blit=True
     )
 
     anim.save(

@@ -120,10 +120,10 @@ def forearm_angle(keypoints, shoulder_id, elbow_id, wrist_id, side):
 
    
     invalid = (
-        np.isnan(upper_angle[:, 0]) |
-        np.isnan(upper_angle[:, 1]) |
-        np.isnan(forearm_angle[:, 0]) |
-        np.isnan(forearm_angle[:, 1])
+        np.isnan(upper_arm[:, 0]) |
+        np.isnan(upper_arm[:, 1]) |
+        np.isnan(forearm[:, 0]) |
+        np.isnan(forearm[:, 1])
     )
 
     angle[invalid] = np.nan
@@ -211,14 +211,16 @@ def extract_features(keypoints, fps):
         keypoints,
         LEFT_SHOULDER,
         LEFT_ELBOW,
-        LEFT_WRIST
+        LEFT_WRIST,
+        "left"
     )
 
     right_angle = forearm_angle(
         keypoints,
         RIGHT_SHOULDER,
         RIGHT_ELBOW,
-        RIGHT_WRIST
+        RIGHT_WRIST,
+        "right"
     )
 
     features.update(angle_stats(left_angle, "left_forearm", fps))
