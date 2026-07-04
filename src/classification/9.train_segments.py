@@ -59,7 +59,6 @@ def main():
         segments = np.array_split(keypoints, NUM_SEGMENTS, axis=0)
 
         for segment_kp in segments:
-            # Se il segmento ha meno di 10 frame, non calcoliamo le feature (troppo corto)
             if len(segment_kp) < 10:
                 continue
 
@@ -69,7 +68,6 @@ def main():
                 continue
 
             features["label"] = label
-            # Salviamo il nome base per poter raggruppare i segmenti dopo
             features["sequence"] = filename.replace(".pkl", "")
             rows.append(features)
 
@@ -92,7 +90,6 @@ def train_model():
     train_df = df[df["base_name"].isin(train_coreo)]
     test_df = df[df["base_name"].isin(test_coreo)]
 
-    # I dati di train ora sono formati dai singoli segmenti (non raggruppati)
     X_train = train_df.drop(columns=["label", "sequence", "base_name"])
     y_train = train_df["label"]
 
@@ -108,7 +105,7 @@ def train_model():
     pipeline.fit(X_train, y_train)
     joblib.dump(pipeline, MODEL_PATH)
 
-    print("\n--- TEST RESULTS (MAJORITY VOTING PER VIDEO) ---")
+    print("\n--- TEST RESULTS ---")
     
     # 1. Predizione sui singoli segmenti
     pred_segments = pipeline.predict(X_test)
@@ -134,7 +131,6 @@ def train_model():
     # Per la Top-3, calcoliamo la media delle probabilità dei 10 segmenti
     video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
-    # 4. Metriche Finali
     print(classification_report(video_labels, video_predictions, target_names=CLASSES))
 
     cm = confusion_matrix(video_labels, video_predictions, labels=list(range(len(CLASSES))))

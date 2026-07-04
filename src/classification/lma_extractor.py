@@ -19,6 +19,9 @@ JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW,
           LEFT_WRIST, RIGHT_WRIST, LEFT_HIP, RIGHT_HIP, 
           LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
 
+UPPER_JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW, LEFT_WRIST, RIGHT_WRIST]
+LOWER_JOINTS = [LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
+
 
 def normalize_keypoints(keypoints):
     kp = keypoints.copy()
@@ -33,9 +36,14 @@ def normalize_keypoints(keypoints):
     kp[:, :, :2] -= initial_center[None, None, :]
 
     nose = kp[:, NOSE, :2]
-    ankle = kp[:, RIGHT_ANKLE, :2]
-    distances = np.linalg.norm(nose - ankle, axis=1)
-    valid_distances = distances[~np.isnan(distances)]
+
+    l_ankle = kp[:, LEFT_ANKLE, :2]
+    r_ankle = kp[:, RIGHT_ANKLE, :2]
+    
+    dist_l = np.linalg.norm(nose - l_ankle, axis=1)
+    dist_r = np.linalg.norm(nose - r_ankle, axis=1)
+    
+    valid_distances = np.concatenate([dist_l[~np.isnan(dist_l)], dist_r[~np.isnan(dist_r)]])
 
     if len(valid_distances) == 0:
         return kp
@@ -49,28 +57,37 @@ def normalize_keypoints(keypoints):
 
 def get_speed_accel(x_arr, y_arr, fps):
     valid = ~(np.isnan(x_arr) | np.isnan(y_arr))
-    if np.sum(valid) < 3:
-        return np.zeros(len(x_arr)), np.zeros(len(x_arr))
+    valid_idx = np.where(valid)[0]
     
-    vx = np.zeros_like(x_arr)
-    vy = np.zeros_like(y_arr)
-    vx[valid][:-1] = np.diff(x_arr[valid]) * fps
-    vy[valid][:-1] = np.diff(y_arr[valid]) * fps
+    if len(valid_idx) < 3:
+        return np.full(len(x_arr), np.nan), np.full(len(x_arr), np.nan)
+    
+    vx = np.full_like(x_arr, np.nan)
+    vy = np.full_like(y_arr, np.nan)
+    
+    # Calcolo tempo reale trascorso tra frame validi
+    dt = np.diff(valid_idx) / fps
+    dt[dt == 0] = 1/fps # Sicurezza contro divisioni per 0
+    
+    vx[valid_idx[:-1]] = np.diff(x_arr[valid_idx]) / dt
+    vy[valid_idx[:-1]] = np.diff(y_arr[valid_idx]) / dt
     speed = np.sqrt(vx**2 + vy**2)
     
-    ax = np.zeros_like(x_arr)
-    ay = np.zeros_like(y_arr)
-    ax[valid][:-2] = np.diff(vx[valid][:-1]) * fps
-    ay[valid][:-2] = np.diff(vy[valid][:-1]) * fps
+    ax = np.full_like(x_arr, np.nan)
+    ay = np.full_like(y_arr, np.nan)
+    
+    # Il gap temporale per l'accelerazione
+    dt_accel = np.diff(valid_idx[:-1]) / fps
+    dt_accel[dt_accel == 0] = 1/fps
+    
+    ax[valid_idx[:-2]] = np.diff(vx[valid_idx[:-1]]) / dt_accel
+    ay[valid_idx[:-2]] = np.diff(vy[valid_idx[:-1]]) / dt_accel
     accel = np.sqrt(ax**2 + ay**2)
     
-    speed[~valid] = np.nan
-    accel[~valid] = np.nan
     return speed, accel
 
-# --- TUE FUNZIONI DEGLI ANGOLI ---
+
 def joint_angle(keypoints, joint_a, vertex, joint_b, side):
-    """Generalizzata per funzionare sia su braccia che gambe"""
     seg_a = keypoints[:, joint_a, :2] - keypoints[:, vertex, :2]
     seg_b = keypoints[:, joint_b, :2] - keypoints[:, vertex, :2]
 
@@ -89,14 +106,20 @@ def joint_angle(keypoints, joint_a, vertex, joint_b, side):
 
 def angle_stats(angles, name, fps):
     valid = ~np.isnan(angles)
-    angles = angles[valid]
+    valid_idx = np.where(valid)[0]
+    valid_angles = angles[valid_idx]
 
-    if len(angles) < 2:
+    if len(valid_angles) < 2:
         return {f"{name}_angular_speed_median": 0.0 }
 
-    diff = np.diff(angles)
+    diff = np.diff(valid_angles)
     diff = (diff + 180) % 360 - 180
-    angular_speed = np.abs(diff) * fps
+    
+    # Tempo reale trascorso tra gli angoli calcolati
+    dt = np.diff(valid_idx) / fps
+    dt[dt == 0] = 1/fps
+
+    angular_speed = np.abs(diff) / dt
     return {f"{name}_angular_speed_median": np.median(angular_speed)}
 
 def angle_histogram(angles, name):
@@ -132,14 +155,14 @@ def extract_features(keypoints, fps):
     right_knee = joint_angle(kp, RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE, "right")
 
 
-    # 1. BODY
+    # BODY
     for j in JOINTS:
         dist_to_hip = np.sqrt((x[:, j] - hip_center_x)**2 + (y[:, j] - hip_center_y)**2)
         features[f'body_dist_hip_mean_{j}'] = np.nanmean(dist_to_hip)
         features[f'body_dist_hip_std_{j}'] = np.nanstd(dist_to_hip)
 
 
-    # 2. SHAPE 
+    # SHAPE 
     with np.errstate(invalid='ignore'):
         min_x, max_x = np.nanmin(x[:, JOINTS], axis=1), np.nanmax(x[:, JOINTS], axis=1)
         min_y, max_y = np.nanmin(y[:, JOINTS], axis=1), np.nanmax(y[:, JOINTS], axis=1)
@@ -159,12 +182,22 @@ def extract_features(keypoints, fps):
     features['shape_cross_distance_mean'] = np.nanmean(cross_mean)
     features['shape_cross_distance_std'] = np.nanstd(cross_mean)
 
+    uc_x = np.nanmean(x[:, UPPER_JOINTS], axis=1)
+    uc_y = np.nanmean(y[:, UPPER_JOINTS], axis=1)
+    upper_dispersion = np.nanmean([np.sqrt((x[:, j] - uc_x)**2 + (y[:, j] - uc_y)**2) for j in UPPER_JOINTS], axis=0)
+    features['shape_upper_dispersion_mean'] = np.nanmean(upper_dispersion)
+
+    lc_x = np.nanmean(x[:, LOWER_JOINTS], axis=1)
+    lc_y = np.nanmean(y[:, LOWER_JOINTS], axis=1)
+    lower_dispersion = np.nanmean([np.sqrt((x[:, j] - lc_x)**2 + (y[:, j] - lc_y)**2) for j in LOWER_JOINTS], axis=0)
+    features['shape_lower_dispersion_mean'] = np.nanmean(lower_dispersion)
+
     features.update(angle_histogram(left_elbow, "left_forearm"))
     features.update(angle_histogram(right_elbow, "right_forearm"))
     features.update(angle_histogram(left_knee, "left_calf"))
     features.update(angle_histogram(right_knee, "right_calf"))
 
-    # 3. EFFORT
+    # EFFORT
     lw_s, lw_a = get_speed_accel(x[:, LEFT_WRIST], y[:, LEFT_WRIST], fps)
     rw_s, rw_a = get_speed_accel(x[:, RIGHT_WRIST], y[:, RIGHT_WRIST], fps)
     la_s, la_a = get_speed_accel(x[:, LEFT_ANKLE], y[:, LEFT_ANKLE], fps)
@@ -180,8 +213,7 @@ def extract_features(keypoints, fps):
     features.update(angle_stats(left_knee, "left_calf", fps))
     features.update(angle_stats(right_knee, "right_calf", fps))
 
-
-    # 4. SPACE 
+    # SPACE 
     valid_hips = ~(np.isnan(hip_center_x) | np.isnan(hip_center_y))
     hc_x_valid = hip_center_x[valid_hips]
     hc_y_valid = hip_center_y[valid_hips]

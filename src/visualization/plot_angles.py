@@ -24,6 +24,7 @@ RIGHT_WRIST = 10
 LEFT_HIP = 11
 RIGHT_HIP = 12
 RIGHT_ANKLE = 16
+LEFT_ANKLE = 15
 
 
 def load_data(path):
@@ -33,33 +34,30 @@ def load_data(path):
 
 def normalize_keypoints(keypoints):
     kp = keypoints.copy()
-
     hips_center = (kp[:, LEFT_HIP, :2] + kp[:, RIGHT_HIP, :2]) / 2
-
-    valid_center = ~(
-        np.isnan(hips_center[:, 0]) |
-        np.isnan(hips_center[:, 1])
-    )
+    valid_center = ~(np.isnan(hips_center[:, 0]) | np.isnan(hips_center[:, 1]))
 
     if np.sum(valid_center) == 0:
         return kp
 
     first_valid_idx = np.where(valid_center)[0][0]
     initial_center = hips_center[first_valid_idx]
-
     kp[:, :, :2] -= initial_center[None, None, :]
 
     nose = kp[:, NOSE, :2]
-    ankle = kp[:, RIGHT_ANKLE, :2]
 
-    distances = np.linalg.norm(nose - ankle, axis=1)
-    valid_distances = distances[~np.isnan(distances)]
+    l_ankle = kp[:, LEFT_ANKLE, :2]
+    r_ankle = kp[:, RIGHT_ANKLE, :2]
+    
+    dist_l = np.linalg.norm(nose - l_ankle, axis=1)
+    dist_r = np.linalg.norm(nose - r_ankle, axis=1)
+    
+    valid_distances = np.concatenate([dist_l[~np.isnan(dist_l)], dist_r[~np.isnan(dist_r)]])
 
     if len(valid_distances) == 0:
         return kp
 
     max_dist = np.max(valid_distances)
-
     if max_dist > 0:
         kp[:, :, :2] /= max_dist
 

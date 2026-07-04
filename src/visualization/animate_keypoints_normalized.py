@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-FILE = "annotations/keypoints2d/gWA_sBM_cAll_d25_mWA0_ch02.pkl"
+FILE = "annotations/keypoints2d/gMH_sFM_cAll_d22_mMH1_ch02.pkl"
 #FILE = "outputs/keypoints/gJS_yt_02.pkl"
 
 CAMERA = 0
@@ -36,6 +36,7 @@ NOSE = 0
 LEFT_HIP = 11
 RIGHT_HIP = 12
 RIGHT_ANKLE = 16
+LEFT_ANKLE = 15
 
 
 def load_data(path):
@@ -45,22 +46,30 @@ def load_data(path):
 
 def normalize_keypoints(keypoints):
     kp = keypoints.copy()
+    hips_center = (kp[:, LEFT_HIP, :2] + kp[:, RIGHT_HIP, :2]) / 2
+    valid_center = ~(np.isnan(hips_center[:, 0]) | np.isnan(hips_center[:, 1]))
 
-    initial_center = (
-        kp[0, LEFT_HIP, :2] +
-        kp[0, RIGHT_HIP, :2]
-    ) / 2
+    if np.sum(valid_center) == 0:
+        return kp
 
+    first_valid_idx = np.where(valid_center)[0][0]
+    initial_center = hips_center[first_valid_idx]
     kp[:, :, :2] -= initial_center[None, None, :]
 
-
     nose = kp[:, NOSE, :2]
-    ankle = kp[:, RIGHT_ANKLE, :2]
 
-    distances = np.linalg.norm(nose - ankle, axis=1)
+    l_ankle = kp[:, LEFT_ANKLE, :2]
+    r_ankle = kp[:, RIGHT_ANKLE, :2]
+    
+    dist_l = np.linalg.norm(nose - l_ankle, axis=1)
+    dist_r = np.linalg.norm(nose - r_ankle, axis=1)
+    
+    valid_distances = np.concatenate([dist_l[~np.isnan(dist_l)], dist_r[~np.isnan(dist_r)]])
 
-    max_dist = np.nanmax(distances)
+    if len(valid_distances) == 0:
+        return kp
 
+    max_dist = np.max(valid_distances)
     if max_dist > 0:
         kp[:, :, :2] /= max_dist
 

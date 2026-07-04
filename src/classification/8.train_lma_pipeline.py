@@ -3,17 +3,19 @@ import pickle
 import numpy as np
 import pandas as pd
 import joblib
+import warnings
 import matplotlib.pyplot as plt
 
-from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, top_k_accuracy_score
+from sklearn.model_selection import GroupShuffleSplit, GroupKFold, RandomizedSearchCV, train_test_split
 
 from lma_extractor import extract_features
+
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
 
 KEYPOINT_DIR = "annotations/keypoints2d"
@@ -73,14 +75,11 @@ def train_model():
     df = pd.read_csv(DATASET)
     
     df["base_name"] = df["sequence"].str.split("_ch").str[0]
-    coreografie_uniche = df["base_name"].unique()
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx, test_idx = next(gss.split(df, groups=df["base_name"]))
 
-    train_coreo, test_coreo = train_test_split(
-        coreografie_uniche, test_size=0.2, random_state=42
-    )
-
-    train_df = df[df["base_name"].isin(train_coreo)]
-    test_df = df[df["base_name"].isin(test_coreo)]
+    train_df = df.iloc[train_idx]
+    test_df = df.iloc[test_idx]
 
     X_train = train_df.drop(columns=["label", "sequence", "base_name"])
     y_train = train_df["label"]
@@ -90,14 +89,23 @@ def train_model():
 
     pipeline = Pipeline([
         ('imputer', SimpleImputer(strategy='median')), 
-        ('scaler', StandardScaler()),
-        ('classifier', RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1))
+        ('classifier', RandomForestClassifier(
+            n_estimators=300,
+            random_state=42,
+            n_jobs=-1
+        ))
     ])
 
     pipeline.fit(X_train, y_train)
-    joblib.dump(pipeline, MODEL_PATH)
+    joblib.dump(pipeline, MODEL_PATH) 
 
-    print("\n--- TEST RESULTS ---")
+    importances = pipeline.named_steps['classifier'].feature_importances_
+    feat_names = X_train.columns
+    top10 = sorted(zip(feat_names, importances), key=lambda x: -x[1])[:10]
+    for name, imp in top10:
+        print(f"{name}: {imp:.4f}")
+
+    print("\nTEST RESULTS")
     pred = pipeline.predict(X_test)
     print(classification_report(y_test, pred, target_names=CLASSES))
 
