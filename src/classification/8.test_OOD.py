@@ -27,7 +27,6 @@ def get_label(filename):
             return i
     return None
 
-
 def main():
     clf = joblib.load(MODEL_PATH)
 
@@ -91,53 +90,53 @@ def main():
     print(f"Top-3 Accuracy: {top3:.4f}")
     print(f"Macro F1 Score: {f1_score(y, pred, average='macro'):.4f}")
 
-    # --- CONFRONTO SISTEMATICO SU TUTTE LE FEATURE ---
-    train_df = pd.read_csv(DATASET)
-    feature_cols = [c for c in expected_cols if c in ood_df.columns]
 
-    shift_report = []
-    for col in feature_cols:
-        train_vals = train_df[col].dropna()
-        ood_vals = ood_df[col].dropna()
+    # # --- CONFRONTO SISTEMATICO SU TUTTE LE FEATURE ---
+    # train_df = pd.read_csv(DATASET)
+    # feature_cols = [c for c in expected_cols if c in ood_df.columns]
 
-        if len(train_vals) < 2 or len(ood_vals) < 1:
-            continue
+    # shift_report = []
+    # for col in feature_cols:
+    #     train_vals = train_df[col].dropna()
+    #     ood_vals = ood_df[col].dropna()
 
-        train_mean, train_std = train_vals.mean(), train_vals.std()
-        ood_mean = ood_vals.mean()
+    #     if len(train_vals) < 2 or len(ood_vals) < 1:
+    #         continue
 
-        # quanti "std del training" dista in media l'OOD dal training
-        z = (ood_mean - train_mean) / train_std if train_std > 0 else np.nan
+    #     train_mean, train_std = train_vals.mean(), train_vals.std()
+    #     ood_mean = ood_vals.mean()
 
-        # quota di valori OOD completamente fuori dal range [min, max] del training
-        out_of_range = ((ood_vals < train_vals.min()) | (ood_vals > train_vals.max())).mean()
+    #     # quanti "std del training" dista in media l'OOD dal training
+    #     z = (ood_mean - train_mean) / train_std if train_std > 0 else np.nan
 
-        shift_report.append({
-            'feature': col,
-            'train_mean': train_mean,
-            'ood_mean': ood_mean,
-            'z_score': z,
-            'pct_out_of_range': out_of_range
-        })
+    #     # quota di valori OOD completamente fuori dal range [min, max] del training
+    #     out_of_range = ((ood_vals < train_vals.min()) | (ood_vals > train_vals.max())).mean()
 
-    shift_df = pd.DataFrame(shift_report).sort_values('z_score', key=abs, ascending=False)
-    pd.set_option('display.max_rows', 100)
-    print(shift_df.to_string(index=False))
+    #     shift_report.append({
+    #         'feature': col,
+    #         'train_mean': train_mean,
+    #         'ood_mean': ood_mean,
+    #         'z_score': z,
+    #         'pct_out_of_range': out_of_range
+    #     })
 
-    top_shifted = shift_df.head(8)['feature'].tolist()
+    # shift_df = pd.DataFrame(shift_report).sort_values('z_score', key=abs, ascending=False)
+    # pd.set_option('display.max_rows', 100)
+    # print(shift_df.to_string(index=False))
 
-    for col in top_shifted:
-        plt.figure(figsize=(7, 4))
-        plt.hist(train_df[col].dropna(), bins=25, alpha=0.5,
-                  label='train', density=True, color='C0')
-        for val in ood_df[col].dropna():
-            plt.axvline(val, color='C1', alpha=0.7, linewidth=1.5)
-        plt.plot([], [], color='C1', label='OOD (singoli campioni)')
-        plt.legend()
-        plt.title(col)
-        plt.tight_layout()
-        plt.show()
+    # top_shifted = shift_df.head(8)['feature'].tolist()
 
+    # for col in top_shifted:
+    #     plt.figure(figsize=(7, 4))
+    #     plt.hist(train_df[col].dropna(), bins=25, alpha=0.5,
+    #               label='train', density=True, color='C0')
+    #     for val in ood_df[col].dropna():
+    #         plt.axvline(val, color='C1', alpha=0.7, linewidth=1.5)
+    #     plt.plot([], [], color='C1', label='OOD (singoli campioni)')
+    #     plt.legend()
+    #     plt.title(col)
+    #     plt.tight_layout()
+    #     plt.show()
 
 if __name__ == "__main__":
     main()

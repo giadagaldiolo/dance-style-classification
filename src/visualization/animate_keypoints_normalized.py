@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-FILE = "annotations/keypoints2d/gMH_sFM_cAll_d22_mMH1_ch02.pkl"
-#FILE = "outputs/keypoints/gJS_yt_02.pkl"
+#FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch10.pkl"
+FILE = "outputs/keypoints/gMH_yt_03.pkl"
 
 CAMERA = 0
 OUTPUT_DIR = "outputs/animations/normalized"

@@ -2,10 +2,11 @@ import os
 import cv2
 import pickle
 import numpy as np
+import torch
 
 from mmpose.apis import MMPoseInferencer
 
-VIDEO_PATH = "downloaded_videos/gJS_yt_02.mp4"
+VIDEO_PATH = "downloaded_videos/gMH_yt_03.mp4"
 
 OUTPUT_DIR = "outputs/keypoints"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -14,7 +15,8 @@ BASE_NAME = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
 OUTPUT_PKL = os.path.join(OUTPUT_DIR, BASE_NAME + ".pkl")
 CACHE_PATH = os.path.join("downloaded_videos", BASE_NAME + ".npy")
 
-DEVICE = "cpu"
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
+print(f"Device in uso: {DEVICE}")
 
 
 def load_model():
@@ -66,19 +68,21 @@ def extract_person_keypoints(preds):
 
     return np.concatenate([xy, score], axis=1)
 
-def process_video(frames, inferencer, fps=60):
+def process_video(frames, inferencer, fps=60, batch_size=32):
     keypoints_all = []
     timestamps = []
 
-    for frame_id, frame in enumerate(frames):
+    result_generator = inferencer(
+        list(frames),      
+        batch_size=batch_size,
+        show=False,
+        return_vis=False, 
+    )
 
-        result = next(inferencer(frame, show=False))
+    for frame_id, result in enumerate(result_generator):
         preds = result.get("predictions", [])
-
         kp = extract_person_keypoints(preds)
-
         timestamp = int(frame_id / fps * 1_000_000)
-
         keypoints_all.append(kp)
         timestamps.append(timestamp)
 

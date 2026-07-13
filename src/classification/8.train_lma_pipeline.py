@@ -99,12 +99,6 @@ def train_model():
     pipeline.fit(X_train, y_train)
     joblib.dump(pipeline, MODEL_PATH) 
 
-    importances = pipeline.named_steps['classifier'].feature_importances_
-    feat_names = X_train.columns
-    top10 = sorted(zip(feat_names, importances), key=lambda x: -x[1])[:10]
-    for name, imp in top10:
-        print(f"{name}: {imp:.4f}")
-
     print("\nTEST RESULTS")
     pred = pipeline.predict(X_test)
     print(classification_report(y_test, pred, target_names=CLASSES))

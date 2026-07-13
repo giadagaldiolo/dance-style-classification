@@ -17,6 +17,8 @@ from sklearn.metrics import f1_score, top_k_accuracy_score
 
 from lma_extractor import extract_features
 
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+
 KEYPOINT_DIR = "annotations/keypoints2d"
 DATASET = "outputs/classification/multiclass_classification.csv"
 MODEL_PATH = "outputs/classification/multiclass_classification.pkl"
@@ -143,8 +145,8 @@ def train_model():
     plt.show()
 
     top3 = top_k_accuracy_score(video_labels, video_probas, k=3)
-    print(f"Top-3 Accuracy (Media Segmenti): {top3:.4f}")
-    print(f"Macro F1 Score (Majority Voting): {f1_score(video_labels, video_predictions, average='macro'):.4f}")
+    print(f"Top-3 Accuracy: {top3:.4f}")
+    print(f"Macro F1 Score: {f1_score(video_labels, video_predictions, average='macro'):.4f}")
 
 if __name__ == "__main__":
     main()

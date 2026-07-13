@@ -117,8 +117,8 @@ def main():
     plt.show()
 
     top3 = top_k_accuracy_score(video_labels, video_probas, k=3)
-    print(f"Top-3 Accuracy (Media Segmenti): {top3:.4f}")
-    print(f"Macro F1 Score (Majority Voting): {f1_score(video_labels, video_predictions, average='macro'):.4f}")
+    print(f"Top-3 Accuracy: {top3:.4f}")
+    print(f"Macro F1 Score: {f1_score(video_labels, video_predictions, average='macro'):.4f}")
 
 
 if __name__ == "__main__":
