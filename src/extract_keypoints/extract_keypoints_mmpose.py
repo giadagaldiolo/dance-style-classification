@@ -6,7 +6,7 @@ import torch
 
 from mmpose.apis import MMPoseInferencer
 
-VIDEO_PATH = "downloaded_videos/gMH_yt_03.mp4"
+VIDEO_PATH = "downloaded_videos/gWA_yt_03.mp4"
 
 OUTPUT_DIR = "outputs/keypoints"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

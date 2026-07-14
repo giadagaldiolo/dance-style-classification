@@ -8,4 +8,6 @@ downloaded_videos/
 # Output generati dagli script
 outputs/
 
+music/
+
 venv/
