@@ -1,26 +1,4 @@
-"""
-Script di riconoscimento stile di danza in tempo reale.
 
-Flusso:
-1. Cattura dalla webcam per BUFFER_SECONDS secondi (default 10s).
-2. Appena il buffer è pieno, lancia estrazione keypoint + classificazione
-   in un thread separato, cosi' la cattura video continua senza bloccarsi
-   (il ballerino puo' continuare a ballare mentre il sistema elabora).
-3. Appena la classificazione e' pronta, avvia la traccia musicale associata
-   allo stile riconosciuto.
-
-IMPORTANTE (da non modificare mai per "velocizzare" lo script):
-la logica di estrazione feature (extract_features) e' importata da
-lma_extractor.py, lo STESSO modulo usato per costruire il dataset di
-training e per l'estrazione keypoint offline. Qualunque differenza, anche
-minima, tra come le feature vengono calcolate offline e in tempo reale
-reintroduce lo stesso tipo di "distribution shift" gia' diagnosticato e
-corretto nella fase di training/OOD (rumore di tracking, normalizzazione,
-fps). Se in futuro si vuole alleggerire il modello di pose estimation
-(es. rtmpose-s invece di rtmpose-m) per guadagnare velocita', va prima
-ri-validato con le stesse diagnostiche (correlazione con la confidenza,
-tabella degli z-score) usate per il dataset offline.
-"""
 
 import os
 import sys
@@ -34,13 +12,10 @@ import numpy as np
 import pandas as pd
 import joblib
 import torch
+import pygame
 
 from mmpose.apis import MMPoseInferencer
 
-# Import dal modulo condiviso con la pipeline offline (src/classification/).
-# Aggiungiamo "src/" al path di ricerca dei moduli così l'import funziona
-# indipendentemente da dove/come viene lanciato questo script, senza dover
-# copiare o duplicare lma_extractor.py in questa cartella.
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
@@ -48,14 +23,10 @@ if SRC_DIR not in sys.path:
 from classification.lma_extractor import extract_features
 
 
-# --------------------------------------------------------------------------
-# CONFIGURAZIONE
-# --------------------------------------------------------------------------
-
 MODEL_PATH = "outputs/classification/multiclass_classification.pkl"
-LIVE_SESSIONS_DIR = "outputs/keypoints_live"  # stesso formato dei .pkl offline
+LIVE_SESSIONS_DIR = "outputs/keypoints_live"  
 BUFFER_SECONDS = 10
-WEBCAM_INDEX = 0
+WEBCAM_INDEX = 1
 BATCH_SIZE = 16
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -86,18 +57,11 @@ def parse_timestamp(mmss):
     return int(minutes) * 60 + int(seconds)
 
 
-# --------------------------------------------------------------------------
-# ESTRAZIONE KEYPOINT
-# (stessa logica dello script offline, adattata a una lista di frame
-# gia' in memoria invece che letti da file video)
-# --------------------------------------------------------------------------
-
 def load_pose_inferencer():
     return MMPoseInferencer(pose2d="human", device=DEVICE)
 
 
 def extract_keypoints_from_frames(frames, inferencer, batch_size=BATCH_SIZE):
-    """Ritorna un array (T, 17, 3) di keypoint 2D + score, un frame per riga."""
     result_generator = inferencer(
         list(frames),
         batch_size=batch_size,
@@ -121,9 +85,6 @@ def extract_keypoints_from_frames(frames, inferencer, batch_size=BATCH_SIZE):
 
 
 def create_output(keypoints_all, fps, width, height):
-    """Stessa struttura dello script offline (extract_keypoints_mmpose.py),
-    cosi' un file catturato dal vivo e' riutilizzabile ovunque un .pkl
-    offline lo sarebbe (es. come nuovo campione OOD, o per debug)."""
     n_frames = keypoints_all.shape[0]
     timestamps = np.array(
         [int(i / fps * 1_000_000) for i in range(n_frames)],
@@ -143,11 +104,6 @@ def save_output(output, output_path):
         pickle.dump(output, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-# --------------------------------------------------------------------------
-# CLASSIFICAZIONE + AVVIO MUSICA
-# (eseguito nel thread in background, non blocca la cattura webcam)
-# --------------------------------------------------------------------------
-
 def classify_and_play_music(frames_buffer, effective_fps, width, height,
                              inferencer, clf, result_holder):
     t0 = time.time()
@@ -157,9 +113,7 @@ def classify_and_play_music(frames_buffer, effective_fps, width, height,
 
     keypoints = extract_keypoints_from_frames(frames_buffer, inferencer)
 
-    # Salva subito la sessione grezza, PRIMA di classificare: cosi' i
-    # keypoint restano disponibili anche se la classificazione fallisce
-    # (es. persona non rilevata a sufficienza) o per riuso futuro.
+  
     os.makedirs(LIVE_SESSIONS_DIR, exist_ok=True)
     session_name = datetime.now().strftime("live_%Y%m%d_%H%M%S")
     output_pkl = os.path.join(LIVE_SESSIONS_DIR, session_name + ".pkl")
@@ -195,11 +149,6 @@ def classify_and_play_music(frames_buffer, effective_fps, width, height,
 
 
 def play_music_for_style(style):
-    try:
-        import pygame
-    except ImportError:
-        print("pygame non installato. Esegui: pip install pygame")
-        return
 
     entry = MUSIC_BY_CLASS.get(style)
     if not entry:
