@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.signal import savgol_filter
 
 
 NOSE = 0
@@ -16,9 +15,12 @@ RIGHT_KNEE = 14
 LEFT_ANKLE = 15
 RIGHT_ANKLE = 16
 
-JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW, 
-          LEFT_WRIST, RIGHT_WRIST, LEFT_HIP, RIGHT_HIP, 
+JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW,
+          LEFT_WRIST, RIGHT_WRIST, LEFT_HIP, RIGHT_HIP,
           LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
+
+UPPER_JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW, LEFT_WRIST, RIGHT_WRIST]
+LOWER_JOINTS = [LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
 
 
 def normalize_keypoints(keypoints):
@@ -37,10 +39,10 @@ def normalize_keypoints(keypoints):
 
     l_ankle = kp[:, LEFT_ANKLE, :2]
     r_ankle = kp[:, RIGHT_ANKLE, :2]
-    
+
     dist_l = np.linalg.norm(nose - l_ankle, axis=1)
     dist_r = np.linalg.norm(nose - r_ankle, axis=1)
-    
+
     valid_distances = np.concatenate([dist_l[~np.isnan(dist_l)], dist_r[~np.isnan(dist_r)]])
 
     if len(valid_distances) == 0:
@@ -53,33 +55,29 @@ def normalize_keypoints(keypoints):
     return kp
 
 
-def get_speed_accel(x_arr, y_arr, fps, window=7, polyorder=2):
+def get_speed_accel(x_arr, y_arr, fps):
     valid = ~(np.isnan(x_arr) | np.isnan(y_arr))
     valid_idx = np.where(valid)[0]
 
-    if len(valid_idx) < window:
+    if len(valid_idx) < 3:
         return np.full(len(x_arr), np.nan), np.full(len(x_arr), np.nan)
 
-    x_valid = x_arr[valid_idx]
-    y_valid = y_arr[valid_idx]
-
-    x_smooth = savgol_filter(x_valid, window_length=window, polyorder=polyorder)
-    y_smooth = savgol_filter(y_valid, window_length=window, polyorder=polyorder)
+    vx = np.full_like(x_arr, np.nan)
+    vy = np.full_like(y_arr, np.nan)
 
     dt = np.diff(valid_idx) / fps
-    dt[dt == 0] = 1 / fps
+    dt[dt == 0] = 1 / fps 
 
-    vx = np.full(len(x_arr), np.nan)
-    vy = np.full(len(x_arr), np.nan)
-    vx[valid_idx[:-1]] = np.diff(x_smooth) / dt
-    vy[valid_idx[:-1]] = np.diff(y_smooth) / dt
+    vx[valid_idx[:-1]] = np.diff(x_arr[valid_idx]) / dt
+    vy[valid_idx[:-1]] = np.diff(y_arr[valid_idx]) / dt
     speed = np.sqrt(vx**2 + vy**2)
+
+    ax = np.full_like(x_arr, np.nan)
+    ay = np.full_like(y_arr, np.nan)
 
     dt_accel = np.diff(valid_idx[:-1]) / fps
     dt_accel[dt_accel == 0] = 1 / fps
 
-    ax = np.full(len(x_arr), np.nan)
-    ay = np.full(len(x_arr), np.nan)
     ax[valid_idx[:-2]] = np.diff(vx[valid_idx[:-1]]) / dt_accel
     ay[valid_idx[:-2]] = np.diff(vy[valid_idx[:-1]]) / dt_accel
     accel = np.sqrt(ax**2 + ay**2)
@@ -99,24 +97,21 @@ def joint_angle(keypoints, joint_a, vertex, joint_b, side):
     elif side == "right":
         angle = (angle_a - angle_b + 360) % 360
 
-    invalid = (np.isnan(seg_a[:, 0]) | np.isnan(seg_a[:, 1]) | 
+    invalid = (np.isnan(seg_a[:, 0]) | np.isnan(seg_a[:, 1]) |
                np.isnan(seg_b[:, 0]) | np.isnan(seg_b[:, 1]))
     angle[invalid] = np.nan
     return angle
 
-def angle_stats(angles, name, fps, window=7, polyorder=2):
+
+def angle_stats(angles, name, fps):
     valid = ~np.isnan(angles)
     valid_idx = np.where(valid)[0]
     valid_angles = angles[valid_idx]
 
-    if len(valid_angles) < max(window, 4):
+    if len(valid_angles) < 2:
         return {f"{name}_angular_speed_median": 0.0}
 
-    sin_smooth = savgol_filter(np.sin(np.radians(valid_angles)), window, polyorder)
-    cos_smooth = savgol_filter(np.cos(np.radians(valid_angles)), window, polyorder)
-    angles_smooth = np.degrees(np.arctan2(sin_smooth, cos_smooth)) % 360
-
-    diff = np.diff(angles_smooth)
+    diff = np.diff(valid_angles)
     diff = (diff + 180) % 360 - 180
 
     dt = np.diff(valid_idx) / fps
@@ -124,6 +119,7 @@ def angle_stats(angles, name, fps, window=7, polyorder=2):
 
     angular_speed = np.abs(diff) / dt
     return {f"{name}_angular_speed_median": np.median(angular_speed)}
+
 
 def angle_histogram(angles, name):
     valid = ~np.isnan(angles)
@@ -137,15 +133,16 @@ def angle_histogram(angles, name):
 
     return {f"{name}_hist_{i}": hist[i] for i in range(8)}
 
+
 def extract_features(keypoints, fps):
     kp = normalize_keypoints(keypoints)
     features = {}
-    
+
     x = kp[:, :, 0]
     y = kp[:, :, 1]
-    
+
     valid_frames = ~(np.all(np.isnan(x), axis=1) | np.all(np.isnan(y), axis=1))
-    if np.sum(valid_frames) < 10: 
+    if np.sum(valid_frames) < 10:
         return None
 
     hip_center_x = (x[:, LEFT_HIP] + x[:, RIGHT_HIP]) / 2
@@ -157,19 +154,17 @@ def extract_features(keypoints, fps):
     left_knee = joint_angle(kp, LEFT_HIP, LEFT_KNEE, LEFT_ANKLE, "left")
     right_knee = joint_angle(kp, RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE, "right")
 
-
     # BODY
     for j in JOINTS:
         dist_to_hip = np.sqrt((x[:, j] - hip_center_x)**2 + (y[:, j] - hip_center_y)**2)
         features[f'body_dist_hip_mean_{j}'] = np.nanmean(dist_to_hip)
         features[f'body_dist_hip_std_{j}'] = np.nanstd(dist_to_hip)
 
-
-    # SHAPE 
+    # SHAPE
     with np.errstate(invalid='ignore'):
         min_x, max_x = np.nanmin(x[:, JOINTS], axis=1), np.nanmax(x[:, JOINTS], axis=1)
         min_y, max_y = np.nanmin(y[:, JOINTS], axis=1), np.nanmax(y[:, JOINTS], axis=1)
-    
+
     body_area = (max_x - min_x) * (max_y - min_y)
     features['shape_body_area_mean'] = np.nanmean(body_area)
     features['shape_body_area_max'] = np.nanmax(body_area)
@@ -178,14 +173,24 @@ def extract_features(keypoints, fps):
     a2a = np.sqrt((x[:, LEFT_ANKLE] - x[:, RIGHT_ANKLE])**2 + (y[:, LEFT_ANKLE] - y[:, RIGHT_ANKLE])**2)
     features['shape_w2w_mean'] = np.nanmean(w2w)
     features['shape_a2a_mean'] = np.nanmean(a2a)
-    features['shape_w2w_std'] = np.nanstd(w2w)
-    features['shape_a2a_std'] = np.nanstd(a2a)
 
     cross1 = np.sqrt((x[:, LEFT_WRIST] - x[:, RIGHT_ANKLE])**2 + (y[:, LEFT_WRIST] - y[:, RIGHT_ANKLE])**2)
     cross2 = np.sqrt((x[:, RIGHT_WRIST] - x[:, LEFT_ANKLE])**2 + (y[:, RIGHT_WRIST] - y[:, LEFT_ANKLE])**2)
     cross_mean = (cross1 + cross2) / 2
     features['shape_cross_distance_mean'] = np.nanmean(cross_mean)
     features['shape_cross_distance_std'] = np.nanstd(cross_mean)
+
+    uc_x = np.nanmean(x[:, UPPER_JOINTS], axis=1)
+    uc_y = np.nanmean(y[:, UPPER_JOINTS], axis=1)
+    upper_dispersion = np.nanmean(
+        [np.sqrt((x[:, j] - uc_x)**2 + (y[:, j] - uc_y)**2) for j in UPPER_JOINTS], axis=0)
+    features['shape_upper_dispersion_mean'] = np.nanmean(upper_dispersion)
+
+    lc_x = np.nanmean(x[:, LOWER_JOINTS], axis=1)
+    lc_y = np.nanmean(y[:, LOWER_JOINTS], axis=1)
+    lower_dispersion = np.nanmean(
+        [np.sqrt((x[:, j] - lc_x)**2 + (y[:, j] - lc_y)**2) for j in LOWER_JOINTS], axis=0)
+    features['shape_lower_dispersion_mean'] = np.nanmean(lower_dispersion)
 
     features.update(angle_histogram(left_elbow, "left_forearm"))
     features.update(angle_histogram(right_elbow, "right_forearm"))
@@ -208,22 +213,22 @@ def extract_features(keypoints, fps):
     features.update(angle_stats(left_knee, "left_calf", fps))
     features.update(angle_stats(right_knee, "right_calf", fps))
 
-    # SPACE 
-    k = int(fps) # Numero di frame equivalenti a 1 secondo
-    
-    if len(hip_center_x) > k:
-        dx = hip_center_x[k:] - hip_center_x[:-k]
-        dy = hip_center_y[k:] - hip_center_y[:-k]
-        
-        dist_1sec = np.sqrt(dx**2 + dy**2)
-        
-        with np.errstate(invalid='ignore'):
-            mean_vel_1sec = np.nanmean(dist_1sec)
-            if np.isnan(mean_vel_1sec):
-                mean_vel_1sec = 0.0
-    else:
-        mean_vel_1sec = 0.0
+    # SPACE
+    valid_hips = ~(np.isnan(hip_center_x) | np.isnan(hip_center_y))
+    hc_x_valid = hip_center_x[valid_hips]
+    hc_y_valid = hip_center_y[valid_hips]
 
-    features['space_mean_vel_1sec'] = mean_vel_1sec
+    if len(hc_x_valid) > 1:
+        path_length = np.sum(np.sqrt(np.diff(hc_x_valid)**2 + np.diff(hc_y_valid)**2))
+        displacement = np.sqrt((hc_x_valid[-1] - hc_x_valid[0])**2 + (hc_y_valid[-1] - hc_y_valid[0])**2)
+        directness = displacement / path_length if path_length > 0 else 0.0
+    else:
+        path_length = 0.0
+        displacement = 0.0
+        directness = 0.0
+
+    features['space_path_length'] = path_length
+    features['space_displacement'] = displacement
+    features['space_directness'] = directness
 
     return features

@@ -83,25 +83,20 @@ def main():
 
     print("\n--- YOUTUBE TEST RESULTS (MAJORITY VOTING PER VIDEO) ---")
     
-    # 1. Predizione sui singoli segmenti OOD
     pred_segments = clf.predict(X_test)
     proba_segments = clf.predict_proba(X_test)
 
-    # 2. Creazione DataFrame di supporto per il calcolo del Majority Voting
     test_results = df[["label", "sequence"]].copy()
     test_results["pred_segment"] = pred_segments
     
-    # Colonne per salvare le probabilità necessarie alla Top-3
     proba_cols = [f"prob_{c}" for c in range(len(CLASSES))]
     test_results[proba_cols] = proba_segments
 
-    # 3. Raggruppamento per video (sequence) e calcolo della Moda
     video_predictions = test_results.groupby("sequence")["pred_segment"].apply(
         lambda x: x.mode().iloc[0]
     )
     video_labels = test_results.groupby("sequence")["label"].first()
     
-    # Media delle probabilità dei segmenti per stimare la confidenza complessiva del video
     video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
 

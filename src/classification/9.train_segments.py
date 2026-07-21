@@ -56,8 +56,6 @@ def main():
         keypoints = data["keypoints2d"][0]
         fps = data.get("fps", 60)
         
-        # 1. DIVISIONE IN SEGMENTI
-        # array_split divide l'array lungo l'asse temporale (frame) in 10 parti quasi uguali
         segments = np.array_split(keypoints, NUM_SEGMENTS, axis=0)
 
         for segment_kp in segments:
@@ -109,28 +107,21 @@ def train_model():
 
     print("\n--- TEST RESULTS ---")
     
-    # 1. Predizione sui singoli segmenti
     pred_segments = pipeline.predict(X_test)
     proba_segments = pipeline.predict_proba(X_test)
 
-    # 2. Creazione DataFrame di appoggio per il Majority Voting
     test_results = test_df.copy()
     test_results["pred_segment"] = pred_segments
     
-    # Aggiungiamo le probabilità per calcolare la Top-3 globale
     proba_cols = [f"prob_{c}" for c in range(len(CLASSES))]
     test_results[proba_cols] = proba_segments
 
-    # 3. Raggruppamento per video (Sequence)
-    # Calcoliamo la moda per le label predette (Majority Voting)
     video_predictions = test_results.groupby("sequence")["pred_segment"].apply(
-        lambda x: x.mode().iloc[0] # iloc[0] gestisce eventuali pareggi
+        lambda x: x.mode().iloc[0] 
     )
     
-    # Le label vere sono uguali per tutti i segmenti dello stesso video, prendiamo la prima
     video_labels = test_results.groupby("sequence")["label"].first()
 
-    # Per la Top-3, calcoliamo la media delle probabilità dei 10 segmenti
     video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
     print(classification_report(video_labels, video_predictions, target_names=CLASSES))
