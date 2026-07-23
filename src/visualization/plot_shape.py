@@ -19,9 +19,8 @@ from classification.lma_extractor import (
 )
 
 
-PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"  # <-- cambia con un tuo file
+PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl" 
 OUT_PATH = "outputs/feature_plots/plot2_shape_elbow_angle.gif"
-MAX_FRAMES = None  # es. 150 per accorciare l'animazione, None = tutta la sequenza
 
 
 def main():
@@ -39,7 +38,6 @@ def main():
         title="Shape: angolo del gomito sinistro nel tempo",
         ylabel="angolo (gradi, 0-360)",
         out_path=OUT_PATH,
-        max_frames=MAX_FRAMES,
     )
 
 

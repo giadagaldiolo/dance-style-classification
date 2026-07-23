@@ -1,10 +1,4 @@
-"""
-Plot 3 — BODY/SHAPE: area del corpo (bounding box) nel tempo.
 
-Mostra due linee orizzontali, MEDIA e MASSIMO: sono i due valori che
-diventano le feature reali usate dal modello
-(shape_body_area_mean, shape_body_area_max).
-"""
 
 import os
 import sys
@@ -20,21 +14,21 @@ if SRC_DIR not in sys.path:
 from classification.lma_extractor import normalize_keypoints, JOINTS
 
 
-PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"  # <-- cambia con un tuo file
+PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl" 
 OUT_PATH = "outputs/feature_plots/plot3_body_area.gif"
-MAX_FRAMES = None  # es. 150 per accorciare l'animazione, None = tutta la sequenza
+os.makedirs(OUT_PATH, exist_ok=True)
 
-
+ 
 def main():
-    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
-
     keypoints, fps = load_keypoints(PKL_PATH)
-    kp_norm = normalize_keypoints(keypoints)
-    x, y = kp_norm[:, :, 0], kp_norm[:, :, 1]
+    kp = normalize_keypoints(keypoints)
+    x = kp[:, :, 0]
+    y = kp[:, :, 1]
 
     with np.errstate(invalid="ignore"):
         min_x, max_x = np.nanmin(x[:, JOINTS], axis=1), np.nanmax(x[:, JOINTS], axis=1)
         min_y, max_y = np.nanmin(y[:, JOINTS], axis=1), np.nanmax(y[:, JOINTS], axis=1)
+
     body_area = (max_x - min_x) * (max_y - min_y)
 
     mean_area = np.nanmean(body_area)
@@ -43,15 +37,14 @@ def main():
     plot_skeleton_with_timeseries(
         keypoints, fps,
         feature_values=body_area,
-        feature_label="area del corpo (bounding box)",
-        title="Body/Shape: area del corpo nel tempo",
-        ylabel="area (unità normalizzate²)",
+        feature_label="area del corpo",
+        title="Area del corpo nel tempo",
+        ylabel="area (px²)",
         out_path=OUT_PATH,
         hlines=[
-            {"value": mean_area, "label": "media (= feature reale)", "color": "green"},
-            {"value": max_area, "label": "massimo (= feature reale)", "color": "purple"},
+            {"value": mean_area, "label": "mean", "color": "green"},
+            {"value": max_area, "label": "max", "color": "purple"},
         ],
-        max_frames=MAX_FRAMES,
     )
 
 

@@ -157,13 +157,11 @@ def extract_features(keypoints, fps):
     left_knee = joint_angle(kp, LEFT_HIP, LEFT_KNEE, LEFT_ANKLE, "left")
     right_knee = joint_angle(kp, RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE, "right")
 
-
     # BODY
     for j in JOINTS:
         dist_to_hip = np.sqrt((x[:, j] - hip_center_x)**2 + (y[:, j] - hip_center_y)**2)
         features[f'body_dist_hip_mean_{j}'] = np.nanmean(dist_to_hip)
         features[f'body_dist_hip_std_{j}'] = np.nanstd(dist_to_hip)
-
 
     # SHAPE 
     with np.errstate(invalid='ignore'):
@@ -218,12 +216,12 @@ def extract_features(keypoints, fps):
         dist_1sec = np.sqrt(dx**2 + dy**2)
         
         with np.errstate(invalid='ignore'):
-            mean_vel_1sec = np.nanmean(dist_1sec)
-            if np.isnan(mean_vel_1sec):
-                mean_vel_1sec = 0.0
+            median_vel_1sec = np.nanmedian(dist_1sec)
+            if np.isnan(median_vel_1sec):
+                median_vel_1sec = 0.0
     else:
-        mean_vel_1sec = 0.0
+        median_vel_1sec = 0.0
 
-    features['space_mean_vel_1sec'] = mean_vel_1sec
+    features['space_median_vel_1sec'] = median_vel_1sec
 
     return features

@@ -1,6 +1,7 @@
 import numpy as np
 
 
+
 NOSE = 0
 LEFT_SHOULDER = 5
 RIGHT_SHOULDER = 6
@@ -18,9 +19,6 @@ RIGHT_ANKLE = 16
 JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW,
           LEFT_WRIST, RIGHT_WRIST, LEFT_HIP, RIGHT_HIP,
           LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
-
-UPPER_JOINTS = [LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW, LEFT_WRIST, RIGHT_WRIST]
-LOWER_JOINTS = [LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE]
 
 
 def normalize_keypoints(keypoints):
@@ -172,25 +170,16 @@ def extract_features(keypoints, fps):
     w2w = np.sqrt((x[:, LEFT_WRIST] - x[:, RIGHT_WRIST])**2 + (y[:, LEFT_WRIST] - y[:, RIGHT_WRIST])**2)
     a2a = np.sqrt((x[:, LEFT_ANKLE] - x[:, RIGHT_ANKLE])**2 + (y[:, LEFT_ANKLE] - y[:, RIGHT_ANKLE])**2)
     features['shape_w2w_mean'] = np.nanmean(w2w)
+    features['shape_w2w_std'] = np.nanstd(w2w)
+
     features['shape_a2a_mean'] = np.nanmean(a2a)
+    features['shape_a2a_std'] = np.nanstd(a2a)
 
     cross1 = np.sqrt((x[:, LEFT_WRIST] - x[:, RIGHT_ANKLE])**2 + (y[:, LEFT_WRIST] - y[:, RIGHT_ANKLE])**2)
     cross2 = np.sqrt((x[:, RIGHT_WRIST] - x[:, LEFT_ANKLE])**2 + (y[:, RIGHT_WRIST] - y[:, LEFT_ANKLE])**2)
     cross_mean = (cross1 + cross2) / 2
     features['shape_cross_distance_mean'] = np.nanmean(cross_mean)
     features['shape_cross_distance_std'] = np.nanstd(cross_mean)
-
-    uc_x = np.nanmean(x[:, UPPER_JOINTS], axis=1)
-    uc_y = np.nanmean(y[:, UPPER_JOINTS], axis=1)
-    upper_dispersion = np.nanmean(
-        [np.sqrt((x[:, j] - uc_x)**2 + (y[:, j] - uc_y)**2) for j in UPPER_JOINTS], axis=0)
-    features['shape_upper_dispersion_mean'] = np.nanmean(upper_dispersion)
-
-    lc_x = np.nanmean(x[:, LOWER_JOINTS], axis=1)
-    lc_y = np.nanmean(y[:, LOWER_JOINTS], axis=1)
-    lower_dispersion = np.nanmean(
-        [np.sqrt((x[:, j] - lc_x)**2 + (y[:, j] - lc_y)**2) for j in LOWER_JOINTS], axis=0)
-    features['shape_lower_dispersion_mean'] = np.nanmean(lower_dispersion)
 
     features.update(angle_histogram(left_elbow, "left_forearm"))
     features.update(angle_histogram(right_elbow, "right_forearm"))
@@ -214,21 +203,21 @@ def extract_features(keypoints, fps):
     features.update(angle_stats(right_knee, "right_calf", fps))
 
     # SPACE
-    valid_hips = ~(np.isnan(hip_center_x) | np.isnan(hip_center_y))
-    hc_x_valid = hip_center_x[valid_hips]
-    hc_y_valid = hip_center_y[valid_hips]
-
-    if len(hc_x_valid) > 1:
-        path_length = np.sum(np.sqrt(np.diff(hc_x_valid)**2 + np.diff(hc_y_valid)**2))
-        displacement = np.sqrt((hc_x_valid[-1] - hc_x_valid[0])**2 + (hc_y_valid[-1] - hc_y_valid[0])**2)
-        directness = displacement / path_length if path_length > 0 else 0.0
+    k = int(fps) # Numero di frame equivalenti a 1 secondo
+        
+    if len(hip_center_x) > k:
+        dx = hip_center_x[k:] - hip_center_x[:-k]
+        dy = hip_center_y[k:] - hip_center_y[:-k]
+        
+        dist_1sec = np.sqrt(dx**2 + dy**2)
+        
+        with np.errstate(invalid='ignore'):
+            median_vel_1sec = np.nanmedian(dist_1sec)
+            if np.isnan(median_vel_1sec):
+                median_vel_1sec = 0.0
     else:
-        path_length = 0.0
-        displacement = 0.0
-        directness = 0.0
+        median_vel_1sec = 0.0
 
-    features['space_path_length'] = path_length
-    features['space_displacement'] = displacement
-    features['space_directness'] = directness
+    features['space_median_vel_1sec'] = median_vel_1sec
 
     return features

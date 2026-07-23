@@ -1,13 +1,3 @@
-"""
-Utility condivise dagli script di plotting delle feature (uno script per
-ciascun grafico: plot1_effort_wrist_speed.py, plot2_shape_elbow_angle.py,
-plot3_body_area.py — così si possono lanciare/modificare indipendentemente).
-
-Riusa normalize_keypoints da lma_extractor.py (stessa pipeline usata per
-le feature reali), e la stessa palette/schema di scheletro usati nello
-script di debug del progetto (animazioni normalizzate).
-"""
-
 import os
 import sys
 import pickle
@@ -22,9 +12,6 @@ if SRC_DIR not in sys.path:
 
 from classification.lma_extractor import normalize_keypoints
 
-# Palette per i 17 keypoint COCO (uno per indice, stessa usata nello script
-# di debug del progetto). I punti del volto (naso/occhi/orecchie, indici
-# 0-4) vengono mostrati come pallini colorati ma senza linee di collegamento.
 _COLORS = [
     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0],
     [170, 255, 0], [85, 255, 0], [0, 255, 0], [0, 255, 85],
@@ -33,9 +20,6 @@ _COLORS = [
     [255, 0, 170], [255, 0, 85]
 ]
 
-# Connessioni "ossee" tra i 12 joint usati per le feature (spalle, gomiti,
-# polsi, fianchi, ginocchia, caviglie) — stessa lista usata nello script di
-# debug del progetto.
 SKELETON = [
     (5, 6),
     (5, 7), (7, 9),
@@ -59,46 +43,28 @@ def load_keypoints(pkl_path):
 
 def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
                                    out_path, feature_label="feature",
-                                   hlines=None, max_frames=None):
-    """
-    Crea un'animazione a due pannelli:
-    - sinistra: scheletro 2D animato (tutti i 17 keypoint COCO come pallini
-      colorati singolarmente + le 12 linee "ossee" tra i joint usati per
-      le feature), normalizzato con la stessa scala usata nell'estrazione
-      feature
-    - destra: la feature scelta nel tempo, con una linea verticale rossa
-      che segue il frame corrente, sincronizzata con l'animazione
-
-    hlines: lista opzionale di dict {"value", "label", "color"} per marcare
-    valori aggregati (mediana, media, massimo...) usati come feature reale
-    nel dataset. Vanno calcolati dal chiamante SULLA SEQUENZA COMPLETA,
-    prima di eventuali trim fatti solo per la visualizzazione, così la
-    linea riflette il valore vero usato dal modello.
-
-    max_frames: se impostato, mostra solo i primi N frame (utile per
-    accorciare l'animazione). Non influenza il calcolo di `hlines`, che va
-    fatto dal chiamante sui dati completi.
-
-    Il salvataggio usa ffmpeg (output .mp4): rispetta correttamente i tempi
-    reali tra frame, quindi la velocità di riproduzione è sempre quella
-    corretta a qualunque fps nativo, senza bisogno di sotto-campionare.
-    """
+                                   hlines=None):
     kp = normalize_keypoints(keypoints)
     x, y = kp[:, :, 0], kp[:, :, 1]
-
-    if max_frames is not None:
-        x, y = x[:max_frames], y[:max_frames]
-        feature_values = feature_values[:max_frames]
 
     n_frames = len(x)
 
     fig, (ax_skel, ax_feat) = plt.subplots(1, 2, figsize=(11, 5))
 
-    # --- Pannello scheletro ---
+    margin = 0.2
+    tick_step = 0.5
+
+    raw_half_range = max(np.nanmax(np.abs(x)), np.nanmax(np.abs(y))) + margin
+    half_range = np.ceil(raw_half_range / tick_step) * tick_step
+
     ax_skel.set_title("Scheletro 2D (normalizzato)")
-    ax_skel.set_xlim(np.nanmin(x) - 0.2, np.nanmax(x) + 0.2)
-    ax_skel.set_ylim(np.nanmax(y) + 0.2, np.nanmin(y) - 0.2)  # y invertito
-    ax_skel.set_aspect("equal")
+    ax_skel.set_xlim(-half_range, half_range)
+    ax_skel.set_ylim(half_range, -half_range)  
+    ax_skel.set_aspect("equal", adjustable="box")
+
+    ticks = np.arange(-half_range, half_range + tick_step / 2, tick_step)
+    ax_skel.set_xticks(ticks)
+    ax_skel.set_yticks(ticks)
 
     points = []
     for i in range(N_KEYPOINTS):
@@ -110,7 +76,6 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
         line, = ax_skel.plot([], [], color="black", linewidth=1, zorder=2)
         lines.append(line)
 
-    # --- Pannello feature ---
     ax_feat.set_title(title)
     time_axis = np.arange(n_frames) / fps
     ax_feat.plot(time_axis, feature_values, color="darkorange", lw=1.5,
@@ -160,4 +125,4 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
     plt.tight_layout()
     anim.save(out_path, writer="ffmpeg", fps=fps)
     plt.close(fig)
-    print(f"Animazione salvata → {out_path}")
+    print(f"salvata {out_path}")

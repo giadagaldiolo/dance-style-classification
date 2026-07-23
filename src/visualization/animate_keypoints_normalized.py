@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-#FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch10.pkl"
+FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
 #FILE = "outputs/keypoints/gJS_yt_04.pkl"
-FILE = "outputs/keypoints_live/live_20260721_102255.pkl"
+#FILE = "outputs/keypoints_live/live_20260721_102255.pkl"
 
 CAMERA = 0
 OUTPUT_DIR = "outputs/animations/normalized"
@@ -88,18 +88,21 @@ def main():
     x_all = keypoints[:, :, 0]
     y_all = keypoints[:, :, 1]
 
-    xmin = np.nanmin(x_all) - 0.2
-    xmax = np.nanmax(x_all) + 0.2
-    ymin = np.nanmin(y_all) - 0.2
-    ymax = np.nanmax(y_all) + 0.2
-
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymax, ymin)
-    ax.set_aspect("equal")
-    ax.set_xticks(np.arange(np.floor(xmin), np.ceil(xmax) + 0.5, 0.5))
-    ax.set_yticks(np.arange(np.floor(ymin), np.ceil(ymax) + 0.5, 0.5))
+    margin = 0.2
+    tick_step = 0.5
+
+    raw_half_range = max(np.nanmax(np.abs(x_all)), np.nanmax(np.abs(y_all))) + margin
+    half_range = np.ceil(raw_half_range / tick_step) * tick_step
+
+    ax.set_xlim(-half_range, half_range)
+    ax.set_ylim(half_range, -half_range)
+    ax.set_aspect("equal", adjustable="box")
+
+    ticks = np.arange(-half_range, half_range + tick_step / 2, tick_step)
+    ax.set_xticks(ticks)
+    ax.set_yticks(ticks)
 
     points = []
     for i in range(17):
