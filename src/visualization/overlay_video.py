@@ -6,8 +6,8 @@ from matplotlib.animation import FuncAnimation
 import ffmpeg
 
 
-VIDEO_FILE = "downloaded_videos/hiphop_2.mp4"
-PKL_FILE = "outputs/keypoints/hiphop_2.pkl"
+VIDEO_FILE = "outputs/videos_live/live_20260729_234757.mp4"
+PKL_FILE = "outputs/keypoints_live\live_20260729_234757.pkl"
 
 OUTPUT_DIR = "outputs/overlays"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -19,7 +19,6 @@ CACHE_VIDEO = VIDEO_FILE.replace(".mp4", ".npy")
 
 CAMERA = 0
 ID = 10
-TRAIL_LENGTH = 50
 
 _COLORS = [
     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0],
@@ -111,14 +110,6 @@ def main():
         )
         lines.append(line)
 
-
-    trajectory, = ax.plot(
-        [],
-        [],
-        color="red",
-        linewidth=2
-    )
-
     current_artist = ax.scatter(
         [],
         [],
@@ -127,9 +118,6 @@ def main():
     )
 
     title = ax.set_title("Frame 0")
-
-    traj_x = []
-    traj_y = []
 
     def init():
         image_artist.set_data(np.zeros((H, W, 3), dtype=np.uint8))
@@ -140,7 +128,6 @@ def main():
         for line in lines:
             line.set_data([], [])
 
-        trajectory.set_data([], [])
         current_artist.set_offsets(np.empty((0, 2)))
         title.set_text("Frame 0")
 
@@ -148,7 +135,6 @@ def main():
             [image_artist]
             + points
             + lines
-            + [trajectory, current_artist, title]
         )
 
     def update(i):
@@ -184,20 +170,7 @@ def main():
                     [y[a], y[b]]
                 )
 
-        if not np.isnan(x[ID]) and not np.isnan(y[ID]):
-            traj_x.append(x[ID])
-            traj_y.append(y[ID])
-
-            if len(traj_x) > TRAIL_LENGTH:
-                traj_x.pop(0)
-                traj_y.pop(0)
-
-        trajectory.set_data(traj_x, traj_y)
-
-        if len(traj_x) > 0:
-            current_artist.set_offsets([[traj_x[-1], traj_y[-1]]])
-        else:
-            current_artist.set_offsets(np.empty((0, 2)))
+       
 
         title.set_text(f"Frame {i}")
 
@@ -205,7 +178,6 @@ def main():
             [image_artist]
             + points
             + lines
-            + [trajectory, current_artist, title]
         )
 
     anim = FuncAnimation(

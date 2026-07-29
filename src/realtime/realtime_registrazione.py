@@ -12,6 +12,7 @@ import pandas as pd
 import joblib
 import torch
 import pygame
+import subprocess
 
 from mmpose.apis import MMPoseInferencer
 
@@ -27,6 +28,7 @@ LIVE_SESSIONS_DIR = "outputs/keypoints_live"
 BUFFER_SECONDS = 10
 WEBCAM_INDEX = 0
 BATCH_SIZE = 16 
+LIVE_VIDEOS_DIR = "outputs/videos_live" 
 
 
 _SENTINEL = object()
@@ -52,6 +54,30 @@ MUSIC_BY_CLASS = {
 }
 
 METRONOME_BPM = 115.0
+POSE_MAX_DIM = 640  # lato lungo massimo per l'inferenza posa (velocità)
+
+def compute_pose_size(width, height, max_dim=POSE_MAX_DIM):
+    scale = max_dim / max(width, height)
+    if scale >= 1.0:
+        return width, height
+    return int(width * scale), int(height * scale)
+
+def resize_for_pose(frame, target_w, target_h):
+    if (frame.shape[1], frame.shape[0]) == (target_w, target_h):
+        return frame
+    return cv2.resize(frame, (target_w, target_h))
+
+
+
+def start_video_writer_ffmpeg(video_path, width, height, fps, crf=18, preset="fast"):
+    cmd = [
+        "ffmpeg", "-y",
+        "-f", "rawvideo", "-vcodec", "rawvideo", "-pix_fmt", "bgr24",
+        "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
+        "-an", "-vcodec", "libx264", "-preset", preset, "-crf", str(crf),
+        "-pix_fmt", "yuv420p", video_path,
+    ]
+    return subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
 
 def parse_timestamp(mmss):
@@ -59,7 +85,10 @@ def parse_timestamp(mmss):
     return int(minutes) * 60 + int(seconds)
 
 
+
 def generate_click_sound(sample_rate=44100, freq=1000, duration_ms=50, volume=0.5):
+    """Genera un breve 'click' sintetico (tono che si spegne rapidamente),
+    senza bisogno di un file audio esterno per il metronomo."""
     n_samples = int(sample_rate * duration_ms / 1000)
     t = np.linspace(0, duration_ms / 1000, n_samples, False)
     tone = np.sin(freq * t * 2 * np.pi)
@@ -128,7 +157,8 @@ def save_output(output, output_path):
 
 
 def pose_worker_and_classify(frame_queue, inferencer, clf, width, height,
-                              shared_state, result_holder, metronome_stop_event,
+                              pose_width, pose_height, shared_state, result_holder,
+                              session_name, metronome_stop_event,
                               pose_batch_size=BATCH_SIZE):
     t_start = time.time()
     keypoints_list = []
@@ -139,7 +169,7 @@ def pose_worker_and_classify(frame_queue, inferencer, clf, width, height,
         try:
             item = frame_queue.get(timeout=0.5)
         except queue.Empty:
-            pass 
+            pass  # nessun frame arrivato in questo intervallo, si riprova
         else:
             if item is _SENTINEL:
                 capture_ended = True
@@ -150,14 +180,16 @@ def pose_worker_and_classify(frame_queue, inferencer, clf, width, height,
             kp_batch = extract_keypoints_from_frames(
                 pending_frames, inferencer, batch_size=len(pending_frames)
             )
+            kp_batch = rescale_keypoints(kp_batch, pose_width, pose_height, width, height) 
             keypoints_list.extend(list(kp_batch))
             pending_frames = []
 
         if capture_ended and frame_queue.empty() and not pending_frames:
             break
 
+
     n_frames = len(keypoints_list)
-    print(f" {n_frames} frames")
+    print(f"{n_frames} frame")
 
     if n_frames == 0:
         print("Nessun frame valido ricevuto")
@@ -169,7 +201,6 @@ def pose_worker_and_classify(frame_queue, inferencer, clf, width, height,
     effective_fps = shared_state["effective_fps"]
 
     os.makedirs(LIVE_SESSIONS_DIR, exist_ok=True)
-    session_name = datetime.now().strftime("live_%Y%m%d_%H%M%S")
     output_pkl = os.path.join(LIVE_SESSIONS_DIR, session_name + ".pkl")
     output = create_output(keypoints, effective_fps, width, height)
     save_output(output, output_pkl)
@@ -193,7 +224,9 @@ def pose_worker_and_classify(frame_queue, inferencer, clf, width, height,
 
     pred_idx = clf.predict(df)[0]
     pred_class = CLASSES[pred_idx]
-    print(f" Stile riconosciuto: {pred_class}  ")
+
+    total_elapsed = time.time() - t_start
+    print(f"Stile riconosciuto: {pred_class}")
 
     result_holder["style"] = pred_class
     metronome_stop_event.set()
@@ -206,7 +239,7 @@ def play_music_for_style(style):
         print(f"Nessuna traccia associata allo stile '{style}'")
         return
 
-    path, start_str, _bpm = entry
+    path, start_str = entry
     if not os.path.exists(path):
         print(f"File non trovato per lo stile '{style}': {path}")
         return
@@ -218,6 +251,17 @@ def play_music_for_style(style):
     print(f"Musica avviata per stile: {style} (da {start_str})")
 
 
+def rescale_keypoints(keypoints, pose_width, pose_height, video_width, video_height):
+    """Riporta le coordinate dei keypoint dallo spazio 'ridotto' usato per
+    l'inferenza (più rapida) allo spazio del video a piena risoluzione,
+    così il .pkl salvato resta coerente con il video per l'overlay."""
+    scale_x = video_width / pose_width
+    scale_y = video_height / pose_height
+    kp = keypoints.copy()
+    kp[..., 0] *= scale_x  # coordinate x
+    kp[..., 1] *= scale_y  # coordinate y
+    return kp
+
 def main():
     print(f"Device in uso: {DEVICE}")
 
@@ -228,8 +272,22 @@ def main():
     if not cap.isOpened():
         raise RuntimeError(f"Impossibile aprire la webcam (indice {WEBCAM_INDEX})")
 
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+    pose_width, pose_height = compute_pose_size(width, height)
+    session_name = datetime.now().strftime("live_%Y%m%d_%H%M%S")
+
+    os.makedirs(LIVE_VIDEOS_DIR, exist_ok=True)
+    video_path = os.path.join(LIVE_VIDEOS_DIR, session_name + ".mp4")
+
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    if video_fps <= 0:
+        video_fps = 30  # fallback se iVCam non riporta un fps valido
+
+    video_process = start_video_writer_ffmpeg(video_path, width, height, video_fps)
 
     frame_queue = queue.Queue()
     shared_state = {"effective_fps": None}
@@ -244,12 +302,13 @@ def main():
         daemon=True,
     )
     metronome_thread.start()
+    print(f"Metronomo avviato a {METRONOME_BPM:.1f} BPM (media dei brani).")
 
 
     worker_thread = threading.Thread(
         target=pose_worker_and_classify,
-        args=(frame_queue, inferencer, clf, width, height, shared_state,
-              result_holder, metronome_stop_event),
+        args=(frame_queue, inferencer, clf, width, height, pose_width, pose_height,
+            shared_state, result_holder, session_name, metronome_stop_event),
         daemon=True,
     )
     worker_thread.start()
@@ -261,19 +320,24 @@ def main():
     while True:
         ret, frame = cap.read()
         if not ret:
-            print("Impossibile leggere dalla webcam")
+            print("Impossibile leggere dalla webcam, interrompo.")
             break
 
         elapsed = time.time() - start_time
 
         if elapsed <= BUFFER_SECONDS:
-            frame_queue.put(frame)
+            pose_frame = resize_for_pose(frame, pose_width, pose_height)
+            frame_queue.put(pose_frame)          # piccolo → veloce per la posa
+            video_process.stdin.write(frame.tobytes())            # risoluzione piena → video di qualità
             n_captured += 1
         elif not sentinel_sent:
             buffer_snapshot_time = time.time()
             shared_state["effective_fps"] = n_captured / (buffer_snapshot_time - start_time)
             frame_queue.put(_SENTINEL)
             sentinel_sent = True
+            video_process.stdin.close()
+            video_process.wait()
+            print(f"Video salvato: {video_path}")
 
             print(f"\nCattura completata")
 
@@ -300,6 +364,8 @@ def main():
             break
 
     cap.release()
+    video_process.stdin.close()
+    video_process.wait()
     cv2.destroyAllWindows()
 
 
