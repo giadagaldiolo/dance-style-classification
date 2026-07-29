@@ -14,10 +14,11 @@ from classification.lma_extractor import normalize_keypoints, get_speed_accel, R
 
 PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl" 
 OUT_PATH = "outputs/feature_plots/plot1_effort_wrist_speed.gif"
-os.makedirs(OUT_PATH, exist_ok=True)
+
 
 
 def main():
+    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     keypoints, fps = load_keypoints(PKL_PATH)
     kp = normalize_keypoints(keypoints)
     x = kp[:, :, 0]
@@ -32,7 +33,7 @@ def main():
         feature_values=right_wrist_speed,
         feature_label="velocità polsi",
         title="Velocità dei polsi nel tempo",
-        ylabel="velocità (px/frame)",
+        ylabel="velocità (px/s)",
         out_path=OUT_PATH,
         hlines=[{"value": median_speed, "label": "median", "color": "green"}],
     )

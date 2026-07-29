@@ -46,10 +46,10 @@ CLASSES = [
 MUSIC_BY_CLASS = {
     "gBR": ("music/BR.mp3", "0:04"),
     "gHO": ("music/HO.mp3", "0:15"),
-    "gJB": ("music/JB.mp3", "1:22"),
+    "gJB": ("music/JB.mp3", "1:00"),
     "gJS": ("music/JS.mp3", "0:11"),
-    "gKR": ("music/KR.mp3", "0:23"),
-    "gLH": ("music/LH.mp3", "2:16"),
+    "gKR": ("music/KR.mp3", "0:31"),
+    "gLH": ("music/LH.mp3", "1:13"),
     "gLO": ("music/LO.mp3", "0:00"),
     "gMH": ("music/MH.mp3", "1:33"),
     "gPO": ("music/PO.mp3", "1:15"),

@@ -16,7 +16,7 @@ from classification.lma_extractor import normalize_keypoints, JOINTS
 
 PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl" 
 OUT_PATH = "outputs/feature_plots/plot3_body_area.gif"
-os.makedirs(OUT_PATH, exist_ok=True)
+os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 
  
 def main():
