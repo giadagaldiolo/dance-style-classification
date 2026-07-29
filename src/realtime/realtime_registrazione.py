@@ -22,8 +22,10 @@ if SRC_DIR not in sys.path:
 
 from classification.lma_extractor import extract_features
 
+DEMO_MODE = True  # False = modello a 10 classi
 
-MODEL_PATH = "outputs/classification/multiclass_classification.pkl"
+MODEL_PATH = ("outputs/classification/binary_demo_classification.pkl" if DEMO_MODE
+              else "outputs/classification/multiclass_classification.pkl")
 LIVE_SESSIONS_DIR = "outputs/keypoints_live"  
 BUFFER_SECONDS = 10
 WEBCAM_INDEX = 0
