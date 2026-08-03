@@ -60,6 +60,7 @@ def parse_timestamp(mmss):
 
 
 def generate_click_sound(sample_rate=44100, freq=1000, duration_ms=50, volume=0.5):
+    #click_sound = pygame.mixer.Sound("music/strong_beat.wav")
     n_samples = int(sample_rate * duration_ms / 1000)
     t = np.linspace(0, duration_ms / 1000, n_samples, False)
     tone = np.sin(freq * t * 2 * np.pi)
