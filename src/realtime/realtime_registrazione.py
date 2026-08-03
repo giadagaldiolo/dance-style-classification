@@ -42,15 +42,15 @@ CLASSES = [
 
 MUSIC_BY_CLASS = {
     "gBR": ("music/BR.mp3", "0:04"),
-    "gHO": ("music/HO.mp3", "0:15"),
-    "gJB": ("music/JB.mp3", "1:00"),
-    "gJS": ("music/JS.mp3", "0:11"),
-    "gKR": ("music/KR.mp3", "0:31"),
-    "gLH": ("music/LH.mp3", "1:13"),
+    "gHO": ("music/HO.mp3", "0:17"),
+    "gJB": ("music/JB.mp3", "0:54"),
+    "gJS": ("music/JS.mp3", "0:13"),
+    "gKR": ("music/KR.mp3", "0:35"),
+    "gLH": ("music/LH.mp3", "1:06"),
     "gLO": ("music/LO.mp3", "0:00"),
-    "gMH": ("music/MH.mp3", "1:33"),
-    "gPO": ("music/PO.mp3", "1:15"),
-    "gWA": ("music/WA.mp3", "0:17"),
+    "gMH": ("music/MH.mp3", "1:40"),
+    "gPO": ("music/PO.mp3", "1:07"),
+    "gWA": ("music/WA.mp3", "0:18"),
 }
 
 METRONOME_BPM = 115.0
@@ -84,18 +84,6 @@ def parse_timestamp(mmss):
     minutes, seconds = mmss.split(":")
     return int(minutes) * 60 + int(seconds)
 
-
-
-def generate_click_sound(sample_rate=44100, freq=1000, duration_ms=50, volume=0.5):
-    """Genera un breve 'click' sintetico (tono che si spegne rapidamente),
-    senza bisogno di un file audio esterno per il metronomo."""
-    n_samples = int(sample_rate * duration_ms / 1000)
-    t = np.linspace(0, duration_ms / 1000, n_samples, False)
-    tone = np.sin(freq * t * 2 * np.pi)
-    envelope = np.linspace(1, 0, n_samples) ** 2  # spegnimento rapido, suono "secco"
-    wave = (tone * envelope * volume * 32767).astype(np.int16)
-    stereo_wave = np.column_stack([wave, wave])
-    return pygame.sndarray.make_sound(stereo_wave)
 
 
 def metronome_loop(bpm, stop_event, sound):
@@ -294,7 +282,7 @@ def main():
     result_holder = {}
 
     pygame.mixer.init()
-    click_sound = generate_click_sound()
+    click_sound = pygame.mixer.Sound("music/strong_beat.wav")
     metronome_stop_event = threading.Event()
     metronome_thread = threading.Thread(
         target=metronome_loop,
