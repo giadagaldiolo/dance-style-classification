@@ -13,7 +13,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, top_k_accuracy_score
-
+from sustainability_tracker import track, log_metric, get_file_size_mb
+from sklearn.metrics import accuracy_score
 
 from lma_extractor import extract_features
 
@@ -102,7 +103,8 @@ def train_model():
         ('classifier', RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1))
     ])
 
-    pipeline.fit(X_train, y_train)
+    with track("random_forest_classification", metadata={"model": "RandomForest", "n_estimators": 300}):
+        pipeline.fit(X_train, y_train)
     joblib.dump(pipeline, MODEL_PATH)
 
     print("\n--- TEST RESULTS ---")
@@ -125,6 +127,7 @@ def train_model():
     video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
     print(classification_report(video_labels, video_predictions, target_names=CLASSES))
+    
 
     cm = confusion_matrix(video_labels, video_predictions, labels=list(range(len(CLASSES))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES)
@@ -138,6 +141,11 @@ def train_model():
     top3 = top_k_accuracy_score(video_labels, video_probas, k=3)
     print(f"Top-3 Accuracy: {top3:.4f}")
     print(f"Macro F1 Score: {f1_score(video_labels, video_predictions, average='macro'):.4f}")
+
+    video_accuracy = accuracy_score(video_labels, video_predictions)
+    log_metric("random_forest_classification",
+               accuracy=video_accuracy,
+               model_size_mb=get_file_size_mb(MODEL_PATH))
 
 if __name__ == "__main__":
     main()

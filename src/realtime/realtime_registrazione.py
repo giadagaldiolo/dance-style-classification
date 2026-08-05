@@ -41,16 +41,16 @@ CLASSES = [
 ]
 
 MUSIC_BY_CLASS = {
-    "gBR": ("music/BR.mp3", "0:04"),
-    "gHO": ("music/HO.mp3", "0:17"),
-    "gJB": ("music/JB.mp3", "0:54"),
-    "gJS": ("music/JS.mp3", "0:13"),
-    "gKR": ("music/KR.mp3", "0:35"),
-    "gLH": ("music/LH.mp3", "1:06"),
-    "gLO": ("music/LO.mp3", "0:00"),
-    "gMH": ("music/MH.mp3", "1:40"),
-    "gPO": ("music/PO.mp3", "1:07"),
-    "gWA": ("music/WA.mp3", "0:18"),
+    "gBR": ("music_115bpm/BR.mp3", "0:04"),
+    "gHO": ("music_115bpm/HO.mp3", "0:17"),
+    "gJB": ("music_115bpm/JB.mp3", "0:54"),
+    "gJS": ("music_115bpm/JS.mp3", "0:13"),
+    "gKR": ("music_115bpm/KR.mp3", "0:35"),
+    "gLH": ("music_115bpm/LH.mp3", "1:06"),
+    "gLO": ("music_115bpm/LO.mp3", "0:00"),
+    "gMH": ("music_115bpm/MH.mp3", "1:40"),
+    "gPO": ("music_115bpm/PO.mp3", "1:07"),
+    "gWA": ("music_115bpm/WA.mp3", "0:18"),
 }
 
 METRONOME_BPM = 115.0
