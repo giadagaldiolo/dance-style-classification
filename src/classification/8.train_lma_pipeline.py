@@ -11,7 +11,9 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, top_k_accuracy_score
-from sklearn.model_selection import GroupShuffleSplit, GroupKFold, RandomizedSearchCV, train_test_split
+from sklearn.model_selection import GroupShuffleSplit
+from sustainability_tracker import track, log_metric, get_file_size_mb
+from sklearn.metrics import accuracy_score
 
 from lma_extractor import extract_features
 
@@ -38,42 +40,53 @@ def get_label(filename):
 
 
 def main():
-    rows = []
+    with track("whole_video", metadata={
+            "model": "RandomForest",
+            "n_estimators": 300,
+            "approach": "video intero",
+            }):
+        rows = []
 
-    for filename in os.listdir(KEYPOINT_DIR):
-        if not filename.endswith(".pkl") or "_sMM_" in filename:
-            continue
+        for filename in os.listdir(KEYPOINT_DIR):
+            if not filename.endswith(".pkl") or "_sMM_" in filename:
+                continue
 
-        label = get_label(filename)
-        if label is None:
-            continue
+            label = get_label(filename)
+            if label is None:
+                continue
 
-        path = os.path.join(KEYPOINT_DIR, filename)
-        with open(path, "rb") as f:
-            data = pickle.load(f)
+            path = os.path.join(KEYPOINT_DIR, filename)
+            with open(path, "rb") as f:
+                data = pickle.load(f)
 
-        keypoints = data["keypoints2d"][0]
-        fps = data.get("fps", 60)
+            keypoints = data["keypoints2d"][0]
+            fps = data.get("fps", 60)
+            
+            features = extract_features(keypoints, fps)
+
+            if features is None:
+                print("Skipped (troppi NaN):", filename)
+                continue
+
+            features["label"] = label
+            features["sequence"] = filename.replace(".pkl", "")
+            rows.append(features)
+
+        df = pd.DataFrame(rows)
+        df.to_csv(DATASET, index=False)
+        print(f"{len(df)} samples e {len(df.columns)-2} feature.")
         
-        features = extract_features(keypoints, fps)
+        accuracy = train_model()
 
-        if features is None:
-            print("Skipped (troppi NaN):", filename)
-            continue
+    log_metric("whole_video",
+                   accuracy=accuracy,
+                   model_size_mb=get_file_size_mb(MODEL_PATH))
 
-        features["label"] = label
-        features["sequence"] = filename.replace(".pkl", "")
-        rows.append(features)
-
-    df = pd.DataFrame(rows)
-    df.to_csv(DATASET, index=False)
-    print(f"{len(df)} samples e {len(df.columns)-2} feature.")
-    
-    train_model()
+    plt.show()
 
 def train_model():
     df = pd.read_csv(DATASET)
-    
+
     df["base_name"] = df["sequence"].str.split("_ch").str[0]
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
     train_idx, test_idx = next(gss.split(df, groups=df["base_name"]))
@@ -88,7 +101,7 @@ def train_model():
     y_test = test_df["label"]
 
     pipeline = Pipeline([
-        ('imputer', SimpleImputer(strategy='median')), 
+        ('imputer', SimpleImputer(strategy='median')),
         ('classifier', RandomForestClassifier(
             n_estimators=300,
             random_state=42,
@@ -96,26 +109,31 @@ def train_model():
         ))
     ])
 
+   
     pipeline.fit(X_train, y_train)
-    joblib.dump(pipeline, MODEL_PATH) 
+    joblib.dump(pipeline, MODEL_PATH)
+
+
+    proba = pipeline.predict_proba(X_test)
+    pred = pipeline.classes_[np.argmax(proba, axis=1)]
 
     print("\nTEST RESULTS")
-    pred = pipeline.predict(X_test)
     print(classification_report(y_test, pred, target_names=CLASSES))
 
     cm = confusion_matrix(y_test, pred, labels=list(range(len(CLASSES))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES)
-    
+
     fig, ax = plt.subplots(figsize=(10, 8))
     disp.plot(ax=ax, cmap="Blues", values_format="d")
     plt.title("Confusion Matrix")
     plt.tight_layout()
-    plt.show()
 
-    proba = pipeline.predict_proba(X_test)
     top3 = top_k_accuracy_score(y_test, proba, k=3)
     print(f"Top-3 Accuracy: {top3:.4f}")
     print(f"Macro F1 Score: {f1_score(y_test, pred, average='macro'):.4f}")
+
+    return accuracy_score(y_test, pred)
+    
 
 if __name__ == "__main__":
     main()

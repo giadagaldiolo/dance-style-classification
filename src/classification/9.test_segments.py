@@ -12,7 +12,7 @@ from sklearn.metrics import ConfusionMatrixDisplay
 from lma_extractor import extract_features
 
 
-MODEL_PATH = "outputs/classification/multiclass_classification.pkl"
+MODEL_PATH = "outputs/classification/segments_classification.pkl"
 PKL_DIR = "outputs/keypoints"
 
 CLASSES = [
