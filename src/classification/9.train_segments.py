@@ -81,7 +81,7 @@ def main():
         df.to_csv(DATASET, index=False)
         print(f"Dataset salvato con {len(df)} segmenti e {len(df.columns)-2} feature.")
         
-        accuracy =train_model()
+        accuracy = train_model()
 
     log_metric("segments",
                    accuracy=accuracy,

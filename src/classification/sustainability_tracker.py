@@ -63,7 +63,7 @@ def track(label, metadata=None):
             "duration_sec": round(elapsed, 2),
             "energy_kwh": energy_kwh,
             "co2_g": (co2_kg * 1000) if co2_kg is not None else None,
-            "metadata": metadata or {}, # dict opzionale con informazioni note SUBITO (es. tipo di modello, iperparametri).
+            "metadata": metadata or {}, # dict opzionale con informazioni note subito (tipo di modello, iperparametri).
         }
         _append_record(record)
 

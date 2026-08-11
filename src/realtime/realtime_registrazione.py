@@ -313,19 +313,17 @@ def main():
 
         elapsed = time.time() - start_time
 
+        video_process.stdin.write(frame.tobytes())
+
         if elapsed <= BUFFER_SECONDS:
             pose_frame = resize_for_pose(frame, pose_width, pose_height)
             frame_queue.put(pose_frame)          # piccolo → veloce per la posa
-            video_process.stdin.write(frame.tobytes())            # risoluzione piena → video di qualità
             n_captured += 1
         elif not sentinel_sent:
             buffer_snapshot_time = time.time()
             shared_state["effective_fps"] = n_captured / (buffer_snapshot_time - start_time)
             frame_queue.put(_SENTINEL)
             sentinel_sent = True
-            video_process.stdin.close()
-            video_process.wait()
-            print(f"Video salvato: {video_path}")
 
             print(f"\nCattura completata")
 
@@ -354,6 +352,7 @@ def main():
     cap.release()
     video_process.stdin.close()
     video_process.wait()
+    print(f"Video salvato: {video_path}")
     cv2.destroyAllWindows()
 
 
