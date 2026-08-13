@@ -1,5 +1,7 @@
 import os
+import sys
 import pickle
+import time
 import numpy as np
 import pandas as pd
 import joblib
@@ -12,10 +14,15 @@ from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, top_k_accuracy_score
 from sklearn.model_selection import GroupShuffleSplit
-from sustainability_tracker import track, log_metric, get_file_size_mb
 from sklearn.metrics import accuracy_score
 
 from lma_extractor import extract_features
+
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SRC_DIR not in sys.path:
+    sys.path.append(SRC_DIR)
+
+from sustainability.sustainability_tracker import track, log_metric, get_file_size_mb
 
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 
@@ -45,6 +52,7 @@ def main():
             "n_estimators": 300,
             "approach": "video intero",
             }):
+        t_extraction_start = time.time()
         rows = []
 
         for filename in os.listdir(KEYPOINT_DIR):
@@ -61,7 +69,7 @@ def main():
 
             keypoints = data["keypoints2d"][0]
             fps = data.get("fps", 60)
-            
+
             features = extract_features(keypoints, fps)
 
             if features is None:
@@ -75,16 +83,33 @@ def main():
         df = pd.DataFrame(rows)
         df.to_csv(DATASET, index=False)
         print(f"{len(df)} samples e {len(df.columns)-2} feature.")
-        
-        accuracy = train_model()
+        t_extraction_end = time.time()
+
+        # SOLO fit + salvataggio qui dentro -- la valutazione avviene
+        # fuori dal blocco misurato, di proposito (non la conteggiamo).
+        pipeline, X_test, y_test = train_model()
+
+        t_training_end = time.time()
+
+    # Valutazione: FUORI dal "with", non conteggiata nel confronto.
+    accuracy = evaluate_model(pipeline, X_test, y_test)
+
+    extraction_time = t_extraction_end - t_extraction_start
+    training_time = t_training_end - t_extraction_end
+    total_time = t_training_end - t_extraction_start
 
     log_metric("whole_video",
-                   accuracy=accuracy,
-                   model_size_mb=get_file_size_mb(MODEL_PATH))
+               accuracy=accuracy,
+               model_size_mb=get_file_size_mb(MODEL_PATH),
+               extraction_pct=round(100 * extraction_time / total_time, 1),
+               training_pct=round(100 * training_time / total_time, 1))
 
     plt.show()
 
+
 def train_model():
+    """SOLO fit + salvataggio del modello. Nessuna valutazione qui --
+    resta la parte che decidiamo di misurare per il confronto energetico."""
     df = pd.read_csv(DATASET)
 
     df["base_name"] = df["sequence"].str.split("_ch").str[0]
@@ -109,11 +134,15 @@ def train_model():
         ))
     ])
 
-   
     pipeline.fit(X_train, y_train)
     joblib.dump(pipeline, MODEL_PATH)
 
+    return pipeline, X_test, y_test
 
+
+def evaluate_model(pipeline, X_test, y_test):
+    """Valutazione (predict, metriche, confusion matrix) -- volutamente
+    FUORI dal blocco track(), non la conteggiamo nel costo misurato."""
     proba = pipeline.predict_proba(X_test)
     pred = pipeline.classes_[np.argmax(proba, axis=1)]
 
@@ -133,7 +162,7 @@ def train_model():
     print(f"Macro F1 Score: {f1_score(y_test, pred, average='macro'):.4f}")
 
     return accuracy_score(y_test, pred)
-    
+
 
 if __name__ == "__main__":
     main()

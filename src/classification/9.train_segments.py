@@ -1,5 +1,7 @@
 import os
+import sys
 import pickle
+import sys
 import warnings
 import numpy as np
 import pandas as pd
@@ -13,10 +15,14 @@ from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import f1_score, top_k_accuracy_score
-from sustainability_tracker import track, log_metric, get_file_size_mb
 from sklearn.metrics import accuracy_score
-
 from lma_extractor import extract_features
+
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SRC_DIR not in sys.path:
+    sys.path.append(SRC_DIR)
+
+from sustainability.sustainability_tracker import track, log_metric, get_file_size_mb
 
 warnings.filterwarnings('ignore', category=RuntimeWarning)
 

@@ -1,4 +1,5 @@
 import os
+import sys
 import cv2
 import pickle
 import numpy as np
@@ -6,14 +7,19 @@ import torch
 
 from mmpose.apis import MMPoseInferencer
 
-VIDEO_PATH = "downloaded_videos/gBR_yt_04.mp4"
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if SRC_DIR not in sys.path:
+    sys.path.append(SRC_DIR)
+from sustainability.sustainability_tracker import track, log_metric
+
+VIDEO_PATH = "outputs/videos_live/live_20260811_013551.mp4"
 
 OUTPUT_DIR = "outputs/keypoints"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 BASE_NAME = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
 OUTPUT_PKL = os.path.join(OUTPUT_DIR, BASE_NAME + ".pkl")
-CACHE_PATH = os.path.join("downloaded_videos", BASE_NAME + ".npy")
+CACHE_PATH = os.path.join("outputs/videos_live", BASE_NAME + ".npy")
 
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
 print(f"Device in uso: {DEVICE}")
@@ -122,11 +128,17 @@ def main():
 
     print(f"Frames: {len(frames)} | FPS: {fps}")
 
-    keypoints_all, timestamps = process_video(
-        frames,
-        inferencer,
-        fps=fps
-    )
+    with track("pose_estimation_mmpose", metadata={
+        "n_frames": len(frames),
+        "device": DEVICE,
+    }):
+        keypoints_all, timestamps = process_video(
+            frames,
+            inferencer,
+            fps=fps
+        )
+
+    log_metric("pose_estimation_mmpose", n_frames_processed=len(frames))
 
     output = create_output(
         keypoints_all,
