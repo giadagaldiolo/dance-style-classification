@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
+FILE = "annotations/keypoints2d/gJB_sFM_cAll_d07_mJB3_ch04.pkl"
 #FILE = "outputs/keypoints/gJS_yt_04.pkl"
 #FILE = "outputs/keypoints_live/live_20260721_102255.pkl"
 
@@ -85,16 +85,10 @@ def main():
     num_frames = len(keypoints)
     fps = data.get("fps", 60)
 
-    x_all = keypoints[:, :, 0]
-    y_all = keypoints[:, :, 1]
-
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    margin = 0.2
+    half_range = 1.5
     tick_step = 0.5
-
-    raw_half_range = max(np.nanmax(np.abs(x_all)), np.nanmax(np.abs(y_all))) + margin
-    half_range = np.ceil(raw_half_range / tick_step) * tick_step
 
     ax.set_xlim(-half_range, half_range)
     ax.set_ylim(half_range, -half_range)
