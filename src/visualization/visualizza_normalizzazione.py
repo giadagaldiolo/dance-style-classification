@@ -135,7 +135,7 @@ def main():
     # Valore FISSO, uguale per qualunque video -- non calcolato dai due
     # video specifici, cosi' e' sempre confrontabile tra run diversi.
     # Aggiorna con il valore suggerito da find_fixed_axis_range.py.
-    norm_range = 1.5
+    norm_range = 1.0
 
     # Stesso flip applicato ai keypoint normalizzati (centrati sullo 0,
     # quindi qui il flip e' semplicemente un cambio di segno).

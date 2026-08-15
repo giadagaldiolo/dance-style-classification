@@ -12,7 +12,7 @@ if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
 from sustainability.sustainability_tracker import track, log_metric
 
-VIDEO_PATH = "outputs/videos_live/live_20260811_013551.mp4"
+VIDEO_PATH = "outputs/videos_live/live_20260811_012422.mp4"
 
 OUTPUT_DIR = "outputs/keypoints"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

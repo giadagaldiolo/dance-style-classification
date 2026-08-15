@@ -132,7 +132,6 @@ def track(label, metadata=None):
     test set) si aggiungono con log_metric().
     """
     print(f"\n[TRACKER] Inizio: {label}")
-    t0 = time.time()
 
     tracker = None
     if _HAS_CODECARBON:
@@ -148,6 +147,8 @@ def track(label, metadata=None):
                                     # misura, risultando in dati vuoti
         )
         tracker.start()
+
+    t0 = time.time()
 
     try:
         yield
