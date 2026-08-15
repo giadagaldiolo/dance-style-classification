@@ -6,8 +6,8 @@ from matplotlib.animation import FuncAnimation
 import ffmpeg
 
 
-VIDEO_FILE = "outputs/videos_live/live_20260811_014454.mp4"
-PKL_FILE = "outputs/keypoints_live\live_20260811_014454.pkl"
+VIDEO_FILE = "downloaded_videos/gHO_yt_01.mp4"
+PKL_FILE = "outputs/keypoints/gHO_yt_01.pkl"
 
 OUTPUT_DIR = "outputs/overlays"
 os.makedirs(OUTPUT_DIR, exist_ok=True)

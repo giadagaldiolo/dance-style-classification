@@ -30,6 +30,8 @@ WEBCAM_INDEX = 0
 BATCH_SIZE = 16 
 LIVE_VIDEOS_DIR = "outputs/videos_live" 
 
+EXPECTED_TOTAL_FRAMES = 296    
+
 
 _SENTINEL = object()
 
@@ -170,9 +172,11 @@ def pose_worker_and_classify(frame_queue, inferencer, clf, width, height,
             )
             kp_batch = rescale_keypoints(kp_batch, pose_width, pose_height, width, height) 
             keypoints_list.extend(list(kp_batch))
+            shared_state["n_processed"] = len(keypoints_list)
             pending_frames = []
 
         if capture_ended and frame_queue.empty() and not pending_frames:
+            shared_state["queue_drained"] = True 
             break
 
 
@@ -238,6 +242,34 @@ def play_music_for_style(style):
     pygame.mixer.music.play(start=start_seconds)
     print(f"Musica avviata per stile: {style} (da {start_str})")
 
+def draw_progress_bars(display_frame, queue_size, n_processed, max_queue, max_processed, phase_label):
+    """Disegna due barre orizzontali (frame in coda, frame elaborati
+    cumulativi) più l'etichetta della fase corrente, sovrapposte al frame."""
+    h, w = display_frame.shape[:2]
+    bar_x = 20
+    bar_width = 300
+    bar_height = 20
+
+    # Etichetta di fase, sopra le barre
+    cv2.putText(display_frame, phase_label, (bar_x, h - 100),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
+    # Barra 1: frame IN CODA (si riempie durante la cattura, si svuota dopo)
+    y1 = h - 75
+    queue_fill = int(bar_width * min(queue_size / max_queue, 1.0))
+    cv2.rectangle(display_frame, (bar_x, y1), (bar_x + bar_width, y1 + bar_height), (80, 80, 80), 1)
+    cv2.rectangle(display_frame, (bar_x, y1), (bar_x + queue_fill, y1 + bar_height), (0, 165, 255), -1)
+    cv2.putText(display_frame, f"In coda: {queue_size}", (bar_x + bar_width + 10, y1 + 15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+    # Barra 2: frame ELABORATI (cumulativo, cresce sempre)
+    y2 = h - 40
+    processed_fill = int(bar_width * min(n_processed / max_processed, 1.0))
+    cv2.rectangle(display_frame, (bar_x, y2), (bar_x + bar_width, y2 + bar_height), (80, 80, 80), 1)
+    cv2.rectangle(display_frame, (bar_x, y2), (bar_x + processed_fill, y2 + bar_height), (0, 255, 0), -1)
+    cv2.putText(display_frame, f"Elaborati: {n_processed}", (bar_x + bar_width + 10, y2 + 15),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
 
 def rescale_keypoints(keypoints, pose_width, pose_height, video_width, video_height):
     """Riporta le coordinate dei keypoint dallo spazio 'ridotto' usato per
@@ -278,7 +310,7 @@ def main():
     video_process = start_video_writer_ffmpeg(video_path, width, height, video_fps)
 
     frame_queue = queue.Queue()
-    shared_state = {"effective_fps": None}
+    shared_state = {"effective_fps": None, "n_processed": 0, "queue_drained": False}
     result_holder = {}
 
     pygame.mixer.init()
@@ -341,6 +373,25 @@ def main():
         else:
             status = "Elaborazione in corso..."
             color = (255, 255, 0)
+
+        # Determina la fase corrente
+        if elapsed <= BUFFER_SECONDS:
+            phase_label = "Fase 1: Cattura + elaborazione"
+        elif not shared_state["queue_drained"]:
+            phase_label = "Fase 2: Solo elaborazione"
+        elif "style" not in result_holder and "error" not in result_holder:
+            phase_label = "Fase 3: Estrazione feature + classificazione"
+        else:
+            phase_label = "Fase 4: Finito"
+
+        draw_progress_bars(
+            display_frame,
+            queue_size=frame_queue.qsize(),
+            n_processed=shared_state["n_processed"],
+            max_queue=EXPECTED_TOTAL_FRAMES,
+            max_processed=EXPECTED_TOTAL_FRAMES,  
+            phase_label=phase_label,
+        )
 
         cv2.putText(display_frame, status, (20, 40),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
