@@ -3,7 +3,8 @@ annotations/
 
 # Video 
 videos/
-downloaded_videos/
+youtube_videos/
+realtime_post/
 
 # Output generati dagli script
 outputs/
