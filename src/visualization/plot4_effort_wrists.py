@@ -4,7 +4,7 @@ import sys
 import numpy as np
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from utils import load_keypoints, plot_skeleton_with_timeseries
+from utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if SRC_DIR not in sys.path:
@@ -12,9 +12,8 @@ if SRC_DIR not in sys.path:
 from classification.lma_extractor import normalize_keypoints, get_speed_accel, RIGHT_WRIST, LEFT_WRIST
 
 
-PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl" 
-OUT_PATH = "outputs/feature_plots/plot1_effort_wrist_speed.gif"
-
+PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
+OUT_PATH = "outputs/feature_plots/plot4_effort_wrists.mp4"
 
 
 def main():
@@ -26,16 +25,21 @@ def main():
 
     right_wrist_speed, _ = get_speed_accel(x[:, RIGHT_WRIST], y[:, RIGHT_WRIST], fps)
     left_wrist_speed, _ = get_speed_accel(x[:, LEFT_WRIST], y[:, LEFT_WRIST], fps)
+
+    mean_speed_curve = np.nanmean(np.stack([left_wrist_speed, right_wrist_speed]), axis=0)
+
     median_speed = np.nanmedian(np.concatenate([left_wrist_speed, right_wrist_speed]))
 
     plot_skeleton_with_timeseries(
         keypoints, fps,
-        feature_values=right_wrist_speed,
-        feature_label="velocità polsi",
+        feature_values=mean_speed_curve,
+        feature_label="velocità media polsi",
+        feature_color="darkorange",
         title="Velocità dei polsi nel tempo",
-        ylabel="velocità (px/s)",
+        ylabel="velocità (unità corporee/s)",
         out_path=OUT_PATH,
-        hlines=[{"value": median_speed, "label": "median", "color": "green"}],
+        highlight_joints=[LEFT_WRIST, RIGHT_WRIST],
+        hlines=[{"value": median_speed, "label": "mediana", "color": "green"}],
     )
 
 

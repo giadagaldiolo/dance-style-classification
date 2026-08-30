@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, top_k_accuracy_score
 from sklearn.metrics import ConfusionMatrixDisplay
@@ -19,6 +20,11 @@ CLASSES = [
     "gBR", "gHO", "gJB", "gJS", "gKR",
     "gLH", "gLO", "gMH", "gPO", "gWA"
 ]
+FULL_NAMES = {
+    "gBR": "Break", "gHO": "House", "gJB": "Ballet Jazz", "gJS": "Street Jazz",
+    "gKR": "Krump", "gLH": "LA-style Hip-hop", "gLO": "Lock", "gMH": "Middle Hip-hop",
+    "gPO": "Pop", "gWA": "Waack",
+}
 
 NUM_SEGMENTS = 10 
 
@@ -27,6 +33,27 @@ def get_label(filename):
         if filename.startswith(cls):
             return i
     return None
+
+def plot_confusion_matrix_styled(cm, classes):
+    """Confusion matrix con percentuali per riga, nomi degli stili per
+    intero, e colori caldi sulla diagonale -- stile simile a quello
+    usato in Hamscher et al. [6]."""
+    full_labels = [FULL_NAMES[c] for c in classes]
+    cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.heatmap(
+        cm_pct, annot=True, fmt=".1f", cmap="Blues",
+        xticklabels=full_labels, yticklabels=full_labels,
+        cbar_kws={"label": "Predictions (%)"},
+        ax=ax, square=True, linewidths=0.5, linecolor="white",
+        vmin=0, vmax=100,
+    )
+    ax.set_xlabel("Predicted Genre")
+    ax.set_ylabel("True Genre")
+    plt.xticks(rotation=45, ha="right")
+    plt.yticks(rotation=0)
+    plt.tight_layout()
 
 
 def main():
@@ -103,17 +130,13 @@ def main():
     print(classification_report(video_labels, video_predictions, target_names=CLASSES, zero_division=0))
 
     cm = confusion_matrix(video_labels, video_predictions, labels=list(range(len(CLASSES))))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES)
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-    disp.plot(ax=ax, cmap="Blues", values_format="d")
-    plt.title("LMA Segments + Majority Voting — YouTube Test (OOD)")
-    plt.tight_layout()
-    plt.show()
+    plot_confusion_matrix_styled(cm, CLASSES)
 
     top3 = top_k_accuracy_score(video_labels, video_probas, k=3)
     print(f"Top-3 Accuracy: {top3:.4f}")
     print(f"Macro F1 Score: {f1_score(video_labels, video_predictions, average='macro'):.4f}")
+
+    plt.show()
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ import pandas as pd
 import joblib
 import matplotlib.pyplot as plt
 
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit, train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer
@@ -36,6 +36,11 @@ CLASSES = [
     "gBR", "gHO", "gJB", "gJS", "gKR",
     "gLH", "gLO", "gMH", "gPO", "gWA"
 ]
+FULL_NAMES = {
+    "gBR": "Break", "gHO": "House", "gJB": "Ballet Jazz", "gJS": "Street Jazz",
+    "gKR": "Krump", "gLH": "LA-style Hip-hop", "gLO": "Lock", "gMH": "Middle Hip-hop",
+    "gPO": "Pop", "gWA": "Waack",
+}
 
 NUM_SEGMENTS = 10  
 
@@ -44,6 +49,28 @@ def get_label(filename):
         if filename.startswith(cls):
             return i
     return None
+
+def plot_confusion_matrix_styled(cm, classes):
+    """Confusion matrix con percentuali per riga, nomi degli stili per
+    intero, e colori caldi sulla diagonale -- stile simile a quello
+    usato in Hamscher et al. [6]."""
+    full_labels = [FULL_NAMES[c] for c in classes]
+    cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.heatmap(
+        cm_pct, annot=True, fmt=".1f", cmap="Blues",
+        xticklabels=full_labels, yticklabels=full_labels,
+        cbar_kws={"label": "Predictions (%)"},
+        ax=ax, square=True, linewidths=0.5, linecolor="white",
+        vmin=0, vmax=100,
+    )
+    ax.set_xlabel("Predicted Genre")
+    ax.set_ylabel("True Genre")
+    plt.xticks(rotation=45, ha="right")
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+
 
 def main():
     with track("segments", metadata={
@@ -98,14 +125,11 @@ def train_model():
     df = pd.read_csv(DATASET)
 
     df["base_name"] = df["sequence"].str.split("_ch").str[0]
-    coreografie_uniche = df["base_name"].unique()
+    gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx, test_idx = next(gss.split(df, groups=df["base_name"]))
 
-    train_coreo, test_coreo = train_test_split(
-        coreografie_uniche, test_size=0.2, random_state=42
-    )
-
-    train_df = df[df["base_name"].isin(train_coreo)]
-    test_df = df[df["base_name"].isin(test_coreo)]
+    train_df = df.iloc[train_idx]
+    test_df = df.iloc[test_idx]
 
     X_train = train_df.drop(columns=["label", "sequence", "base_name"])
     y_train = train_df["label"]
@@ -139,7 +163,7 @@ def train_model():
     video_labels = test_results.groupby("sequence")["label"].first()
     video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
-    print(classification_report(video_labels, video_predictions, target_names=CLASSES))
+    print(classification_report(video_labels, video_predictions, target_names=CLASSES, digits=4))
 
     cm = confusion_matrix(video_labels, video_predictions, labels=list(range(len(CLASSES))))
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES)

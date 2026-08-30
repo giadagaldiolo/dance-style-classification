@@ -15,6 +15,11 @@ CLASSES = [
     "gBR", "gHO", "gJB", "gJS", "gKR",
     "gLH", "gLO", "gMH", "gPO", "gWA"
 ]
+FULL_NAMES = {
+    "gBR": "Break", "gHO": "House", "gJB": "Ballet Jazz", "gJS": "Street Jazz",
+    "gKR": "Krump", "gLH": "LA-style Hip-hop", "gLO": "Lock", "gMH": "Middle Hip-hop",
+    "gPO": "Pop", "gWA": "Waack",
+}
 
 def main():
     os.makedirs(PLOT_DIR, exist_ok=True)
@@ -79,7 +84,7 @@ def main():
         shap_values_list, 
         X_test_shap,
         plot_type="bar", 
-        class_names=CLASSES,
+        class_names=[FULL_NAMES[c] for c in CLASSES],
         max_display=10, 
         show=False 
     )
@@ -93,7 +98,7 @@ def main():
 
 
     # GRAFICO 2: SHAP Beeswarm Plot per una singola classe
-    target_class_idx = CLASSES.index("gMH")
+    target_class_idx = CLASSES.index("gJS")
     target_class_name = CLASSES[target_class_idx]
     
     plt.figure(figsize=(10, 8))

@@ -35,7 +35,7 @@ from classification.lma_extractor import normalize_keypoints
 VIDEO_A_PKL = "outputs/keypoints/gLO_yt_04.pkl"
 VIDEO_B_PKL = "outputs/keypoints/gHO_yt_02.pkl"
 
-OUT_PATH = "outputs/visualization/normalizzazione_confronto.mp4"
+OUT_PATH = "outputs/normalization/normalizzazione_confronto.mp4"
 PLAYBACK_FPS = 30
 N_FRAMES_TO_SHOW = 420  # 20s a 30fps -- alza/abbassa in base a quanto vuoi che duri
 

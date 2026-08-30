@@ -6,8 +6,8 @@ from matplotlib.animation import FuncAnimation
 import ffmpeg
 
 
-VIDEO_FILE = "downloaded_videos/gHO_yt_01.mp4"
-PKL_FILE = "outputs/keypoints/gHO_yt_01.pkl"
+VIDEO_FILE = "downloaded_videos/gJB_yt_02.mp4"
+PKL_FILE = "outputs/keypoints/gJB_yt_02.pkl"
 
 OUTPUT_DIR = "outputs/overlays"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -94,7 +94,7 @@ def main():
         point = ax.scatter(
             [],
             [],
-            s=150,
+            s=100,
             color=np.array(_COLORS[j]) / 255.0
         )
         points.append(point)

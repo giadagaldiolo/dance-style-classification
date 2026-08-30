@@ -7,6 +7,7 @@ import pandas as pd
 import joblib
 import warnings
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -37,6 +38,12 @@ CLASSES = [
     "gBR", "gHO", "gJB", "gJS", "gKR",
     "gLH", "gLO", "gMH", "gPO", "gWA"
 ]
+
+FULL_NAMES = {
+    "gBR": "Break", "gHO": "House", "gJB": "Ballet Jazz", "gJS": "Street Jazz",
+    "gKR": "Krump", "gLH": "LA-style Hip-hop", "gLO": "Lock", "gMH": "Middle Hip-hop",
+    "gPO": "Pop", "gWA": "Waack",
+}
 
 
 def get_label(filename):
@@ -140,6 +147,29 @@ def train_model():
     return pipeline, X_test, y_test
 
 
+
+
+def plot_confusion_matrix_styled(cm, classes):
+    """Confusion matrix con percentuali per riga, nomi degli stili per
+    intero, e colori caldi sulla diagonale -- stile simile a quello
+    usato in Hamscher et al. [6]."""
+    full_labels = [FULL_NAMES[c] for c in classes]
+    cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+    sns.heatmap(
+        cm_pct, annot=True, fmt=".1f", cmap="Blues",
+        xticklabels=full_labels, yticklabels=full_labels,
+        cbar_kws={"label": "Predictions (%)"},
+        ax=ax, square=True, linewidths=0.5, linecolor="white",
+        vmin=0, vmax=100,
+    )
+    ax.set_xlabel("Predicted Genre")
+    ax.set_ylabel("True Genre")
+    plt.xticks(rotation=45, ha="right")
+    plt.yticks(rotation=0)
+    plt.tight_layout()
+
 def evaluate_model(pipeline, X_test, y_test):
     """Valutazione (predict, metriche, confusion matrix) -- volutamente
     FUORI dal blocco track(), non la conteggiamo nel costo misurato."""
@@ -147,15 +177,10 @@ def evaluate_model(pipeline, X_test, y_test):
     pred = pipeline.classes_[np.argmax(proba, axis=1)]
 
     print("\nTEST RESULTS")
-    print(classification_report(y_test, pred, target_names=CLASSES))
+    print(classification_report(y_test, pred, target_names=CLASSES, digits=4))
 
     cm = confusion_matrix(y_test, pred, labels=list(range(len(CLASSES))))
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=CLASSES)
-
-    fig, ax = plt.subplots(figsize=(10, 8))
-    disp.plot(ax=ax, cmap="Blues", values_format="d")
-    plt.title("Confusion Matrix")
-    plt.tight_layout()
+    plot_confusion_matrix_styled(cm, CLASSES)
 
     top3 = top_k_accuracy_score(y_test, proba, k=3)
     print(f"Top-3 Accuracy: {top3:.4f}")
