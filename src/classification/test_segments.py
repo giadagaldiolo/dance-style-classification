@@ -8,12 +8,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, top_k_accuracy_score
-from sklearn.metrics import ConfusionMatrixDisplay
 
 from lma_extractor import extract_features
 
+warnings.filterwarnings('ignore', category=RuntimeWarning)
 
+# Pretrained "segments" model, produced by train_segments.py.
 MODEL_PATH = "outputs/classification/segments_classification.pkl"
+# Folder with the keypoints extracted from the YouTube out-of-domain videos 
 PKL_DIR = "outputs/keypoints"
 
 CLASSES = [
@@ -26,18 +28,20 @@ FULL_NAMES = {
     "gPO": "Pop", "gWA": "Waack",
 }
 
-NUM_SEGMENTS = 10 
+# Same number of segments used at training time in train_segments.py
+NUM_SEGMENTS = 10
+
 
 def get_label(filename):
+    # Returns the integer class index for a given filename, based on
+    # its genre prefix (e.g. "gBR_..." -> index of "gBR" in CLASSES).
     for i, cls in enumerate(CLASSES):
         if filename.startswith(cls):
             return i
     return None
 
+
 def plot_confusion_matrix_styled(cm, classes):
-    """Confusion matrix con percentuali per riga, nomi degli stili per
-    intero, e colori caldi sulla diagonale -- stile simile a quello
-    usato in Hamscher et al. [6]."""
     full_labels = [FULL_NAMES[c] for c in classes]
     cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
 
@@ -60,6 +64,7 @@ def main():
     clf = joblib.load(MODEL_PATH)
     rows = []
 
+    # Feature extraction
     for f in os.listdir(PKL_DIR):
         if not f.endswith(".pkl") or "_sMM_" in f:
             continue
@@ -86,6 +91,9 @@ def main():
                 continue
 
             feat["label"] = label
+            # Shared across all segments of the same video, used below to
+            # regroup segment-level predictions back into a single
+            # video-level prediction (majority voting).
             feat["sequence"] = f.replace(".pkl", "")
             rows.append(feat)
 
@@ -94,38 +102,43 @@ def main():
         return
 
     df = pd.DataFrame(rows)
-    
+
     X_test = df.drop(columns=["label", "sequence"])
     y_test = df["label"]
 
+    # Recovers the exact feature column order/names the model was
+    # trained on, so that reindex() below can align this new data to it
+    # even if some columns are missing or in a different order
     try:
         expected_cols = clf.feature_names_in_
     except AttributeError:
-        try:
-            expected_cols = clf.named_steps['imputer'].feature_names_in_
-        except AttributeError:
-            expected_cols = clf.named_steps['scaler'].feature_names_in_
-        
+        expected_cols = clf.named_steps['imputer'].feature_names_in_
+
     X_test = X_test.reindex(columns=expected_cols, fill_value=np.nan)
 
     print("\n--- YOUTUBE TEST RESULTS (MAJORITY VOTING PER VIDEO) ---")
-    
+
+    # --- Segment-level predictions ---
     pred_segments = clf.predict(X_test)
     proba_segments = clf.predict_proba(X_test)
 
     test_results = df[["label", "sequence"]].copy()
     test_results["pred_segment"] = pred_segments
-    
+
     proba_cols = [f"prob_{c}" for c in range(len(CLASSES))]
     test_results[proba_cols] = proba_segments
 
+    # --- Recombining segment-level results into video-level results ---
+    # Majority vote: the video's final predicted class is whichever class
+    # was predicted most often among its segments. (x.mode().iloc[0] picks
+        # the most frequent value; iloc[0] breaks ties by taking the first one).
     video_predictions = test_results.groupby("sequence")["pred_segment"].apply(
         lambda x: x.mode().iloc[0]
     )
     video_labels = test_results.groupby("sequence")["label"].first()
-    
-    video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
+    # Top-3 accuracy below uses the MEAN of segment probabilities per video
+    video_probas = test_results.groupby("sequence")[proba_cols].mean().values
 
     print(classification_report(video_labels, video_predictions, target_names=CLASSES, zero_division=0))
 

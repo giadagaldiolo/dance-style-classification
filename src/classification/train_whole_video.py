@@ -19,13 +19,16 @@ from sklearn.metrics import accuracy_score
 
 from lma_extractor import extract_features
 
+
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
 
 from sustainability.sustainability_tracker import track, log_metric, get_file_size_mb
 
+
 warnings.filterwarnings('ignore', category=RuntimeWarning)
+
 
 
 KEYPOINT_DIR = "annotations/keypoints2d"
@@ -47,6 +50,8 @@ FULL_NAMES = {
 
 
 def get_label(filename):
+    # Returns the integer class index for a given AIST++ filename, based
+    # on its genre prefix (e.g. "gBR_..." -> index of "gBR" in CLASSES)
     for i, cls in enumerate(CLASSES):
         if filename.startswith(cls):
             return i
@@ -54,6 +59,8 @@ def get_label(filename):
 
 
 def main():
+    # Everything inside this "with" block is timed and its energy
+    # consumption measured (via CodeCarbon, see sustainability_tracker.py)
     with track("whole_video", metadata={
             "model": "RandomForest",
             "n_estimators": 300,
@@ -62,8 +69,10 @@ def main():
         t_extraction_start = time.time()
         rows = []
 
+        # --- Feature extraction ---
         for filename in os.listdir(KEYPOINT_DIR):
             if not filename.endswith(".pkl") or "_sMM_" in filename:
+                # Skip non-keypoint files and sequences filmed with a moving camera
                 continue
 
             label = get_label(filename)
@@ -74,13 +83,15 @@ def main():
             with open(path, "rb") as f:
                 data = pickle.load(f)
 
-            keypoints = data["keypoints2d"][0]
+            keypoints = data["keypoints2d"][0]  # (T, 17, 3): x, y, confidence
             fps = data.get("fps", 60)
 
             features = extract_features(keypoints, fps)
 
             if features is None:
-                print("Skipped (troppi NaN):", filename)
+                # extract_features returns None if too many frames are
+                # invalid (NaN) to compute reliable features.
+                print("Skipped (too many NaN):", filename)
                 continue
 
             features["label"] = label
@@ -89,22 +100,22 @@ def main():
 
         df = pd.DataFrame(rows)
         df.to_csv(DATASET, index=False)
-        print(f"{len(df)} samples e {len(df.columns)-2} feature.")
+        print(f"{len(df)} samples and {len(df.columns)-2} features.")
         t_extraction_end = time.time()
 
-        # SOLO fit + salvataggio qui dentro -- la valutazione avviene
-        # fuori dal blocco misurato, di proposito (non la conteggiamo).
         pipeline, X_test, y_test = train_model()
 
         t_training_end = time.time()
 
-    # Valutazione: FUORI dal "with", non conteggiata nel confronto.
+    # Evaluation is not included in the tracked energy/time measurement 
     accuracy = evaluate_model(pipeline, X_test, y_test)
 
     extraction_time = t_extraction_end - t_extraction_start
     training_time = t_training_end - t_extraction_end
     total_time = t_training_end - t_extraction_start
 
+    # Logs the results to the sustainability log file (used later by
+    # generate_report.py / plot_two_pipelines.py to build the charts).
     log_metric("whole_video",
                accuracy=accuracy,
                model_size_mb=get_file_size_mb(MODEL_PATH),
@@ -115,10 +126,11 @@ def main():
 
 
 def train_model():
-    """SOLO fit + salvataggio del modello. Nessuna valutazione qui --
-    resta la parte che decidiamo di misurare per il confronto energetico."""
     df = pd.read_csv(DATASET)
 
+    # Groups sequences by genre + choreography, so that a GroupShuffleSplit
+    # never puts the same choreography (danced by a different performer,
+    # on different music) in both train and test.
     df["base_name"] = df["sequence"].str.split("_ch").str[0]
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
     train_idx, test_idx = next(gss.split(df, groups=df["base_name"]))
@@ -132,6 +144,8 @@ def train_model():
     X_test = test_df.drop(columns=["label", "sequence", "base_name"])
     y_test = test_df["label"]
 
+    # Pipeline: median imputation for missing (NaN) feature values, then
+    # a Random Forest with 300 trees. 
     pipeline = Pipeline([
         ('imputer', SimpleImputer(strategy='median')),
         ('classifier', RandomForestClassifier(
@@ -147,13 +161,9 @@ def train_model():
     return pipeline, X_test, y_test
 
 
-
-
 def plot_confusion_matrix_styled(cm, classes):
-    """Confusion matrix con percentuali per riga, nomi degli stili per
-    intero, e colori caldi sulla diagonale -- stile simile a quello
-    usato in Hamscher et al. [6]."""
     full_labels = [FULL_NAMES[c] for c in classes]
+    # Normalizes each row (true class) to percentages, so each row sums to 100%.
     cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
 
     fig, ax = plt.subplots(figsize=(7, 6))
@@ -170,9 +180,12 @@ def plot_confusion_matrix_styled(cm, classes):
     plt.yticks(rotation=0)
     plt.tight_layout()
 
+
 def evaluate_model(pipeline, X_test, y_test):
-    """Valutazione (predict, metriche, confusion matrix) -- volutamente
-    FUORI dal blocco track(), non la conteggiamo nel costo misurato."""
+    # Runs predictions on the test set and reports accuracy, per-class
+    # precision/recall/F1, Top-3 accuracy, and macro F1 -- plus the styled
+    # confusion matrix. Deliberately called OUTSIDE the track() block in
+    # main(), so evaluation cost is not counted in the energy comparison.
     proba = pipeline.predict_proba(X_test)
     pred = pipeline.classes_[np.argmax(proba, axis=1)]
 

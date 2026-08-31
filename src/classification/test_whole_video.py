@@ -8,12 +8,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, top_k_accuracy_score
-from sklearn.metrics import ConfusionMatrixDisplay
 
 from lma_extractor import extract_features
 
-DATASET = "outputs/classification/multiclass_classification.csv" 
+warnings.filterwarnings('ignore', category=RuntimeWarning)
+
+# Pretrained "whole video" model, produced by train_whole_video.py.
 MODEL_PATH = "outputs/classification/multiclass_classification.pkl"
+# Folder with the keypoints extracted from the YouTube out-of-domain videos
 KEYPOINT_DIR = "outputs/keypoints"
 
 CLASSES = [
@@ -28,15 +30,15 @@ FULL_NAMES = {
 
 
 def get_label(filename):
+    # Returns the integer class index for a given filename, based on
+    # its genre prefix (e.g. "gBR_..." -> index of "gBR" in CLASSES)
     for i, cls in enumerate(CLASSES):
         if filename.startswith(cls):
             return i
     return None
 
+
 def plot_confusion_matrix_styled(cm, classes):
-    """Confusion matrix con percentuali per riga, nomi degli stili per
-    intero, e colori caldi sulla diagonale -- stile simile a quello
-    usato in Hamscher et al. [6]."""
     full_labels = [FULL_NAMES[c] for c in classes]
     cm_pct = cm / cm.sum(axis=1, keepdims=True) * 100
 
@@ -54,13 +56,14 @@ def plot_confusion_matrix_styled(cm, classes):
     plt.yticks(rotation=0)
     plt.tight_layout()
 
+
 def main():
     clf = joblib.load(MODEL_PATH)
 
     X = []
     y = []
-    names = []
 
+    # --- Feature extraction ---
     for filename in os.listdir(KEYPOINT_DIR):
         if not filename.endswith(".pkl") or "_sMM_" in filename:
             continue
@@ -84,17 +87,18 @@ def main():
 
         X.append(features)
         y.append(label)
-        names.append(filename)
 
     df = pd.DataFrame(X)
     y = np.array(y)
-    ood_df = df.copy()
 
+    # Recovers the exact feature column order/names the model was
+    # trained on, so that reindex() below can align this new data to it
+    # even if some columns are missing or in a different order.
     try:
         expected_cols = clf.feature_names_in_
     except AttributeError:
         expected_cols = clf.named_steps['imputer'].feature_names_in_
-        
+
     df = df.reindex(columns=expected_cols, fill_value=np.nan)
 
     print("\n--- TEST RESULTS (OOD DATA) ---")
@@ -105,7 +109,6 @@ def main():
     cm = confusion_matrix(y, pred, labels=list(range(len(CLASSES))))
     plot_confusion_matrix_styled(cm, CLASSES)
 
-    
     proba = clf.predict_proba(df)
     top3 = top_k_accuracy_score(y, proba, k=3)
 
@@ -113,6 +116,7 @@ def main():
     print(f"Macro F1 Score: {f1_score(y, pred, average='macro'):.4f}")
 
     plt.show()
+
 
 if __name__ == "__main__":
     main()
