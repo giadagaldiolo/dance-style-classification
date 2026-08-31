@@ -1,25 +1,15 @@
 """
-Due file, ciascuno con DUE pannelli affiancati che condividono lo stesso
-asse y (le fasi della pipeline, etichettate una sola volta, a sinistra):
+Two files, each with TWO side-by-side panels sharing the same y axis
+(the pipeline phases, labelled only once, on the left):
 
-1. pipeline_live.png: pannello sinistro = tempo, pannello destro = energia,
-   per la sessione live di 10 secondi.
-2. pipeline_training.png: stessa struttura, per la pipeline di training
-   sull'intero dataset -- qui entrambi i pannelli usano la scala
-   logaritmica, perché lo squilibrio tra le fasi è troppo grande per una
-   scala lineare sia in tempo sia in energia.
+1. pipeline_live.png: left panel = time, right panel = energy,
+   for the 10-second live session.
+2. pipeline_training.png: same structure, for the training pipeline on
+   the whole dataset.  here both panels use a logarithmic scale
 
-In entrambi i pannelli, la potenza media (W) è riportata in etichetta
-accanto a ciascuna barra.
+In both panels, the average power (W) is reported as a label next to
+each bar.
 
-Nota sulla stima dell'estrazione keypoint per il training: AIST++
-fornisce i file di keypoint già estratti, quindi questa fase non viene
-mai eseguita realmente in questo lavoro. Il suo costo è stimato per
-estrapolazione lineare dal benchmark su un singolo video di 10 secondi
-(pose_estimation_mmpose), moltiplicato per il rapporto tra la durata
-totale del dataset di training e quei 10 secondi. Presuppone quindi che
-il costo cresca linearmente con la durata del video -- un'assunzione
-ragionevole ma non verificata direttamente.
 """
 
 import os
@@ -31,7 +21,7 @@ from sustainability_tracker import _load_records
 
 REPORT_DIR = "outputs/sustainability"
 
-# Durata totale del dataset di training, da compute_training_dataset_duration.py
+# Total duration of the training dataset
 TRAINING_DATASET_DURATION_SEC = 18776.8
 SINGLE_VIDEO_DURATION_SEC = 10.0
 
@@ -42,13 +32,18 @@ def get_latest(label):
 
 
 def avg_power_w(energy_kwh, duration_sec):
-    """Potenza media (W) = energia (Wh) x 3600 / durata (s)."""
+    """Average power (W) = energy (Wh) x 3600 / duration (s)."""
     if energy_kwh is None or duration_sec is None or duration_sec <= 0:
         return None
     return energy_kwh * 1000 * 3600 / duration_sec
 
 
 def _draw_panel(ax, labels, values, energies, durations, xlabel, log_scale, show_power_label=True):
+    """Draws one panel (either the time or the energy side) of the dual
+    chart. `values` is what actually determines the bar length (time or
+    energy, depending on the caller); `energies`/`durations` are always
+    passed so the average power label can be computed the same way
+    regardless of which metric is on this particular panel's axis."""
     bars = ax.barh(labels, values, color="#4C72B0")
     ax.set_xlabel(xlabel + (" -- scala log." if log_scale else ""), fontsize=13)
     ax.tick_params(axis="both", labelsize=12)
@@ -66,11 +61,11 @@ def _draw_panel(ax, labels, values, energies, durations, xlabel, log_scale, show
 
 
 def plot_pipeline_dual(phases, title, out_path, log_scale=False):
-    """phases: lista di (nome, durata_sec, energia_kwh_o_None).
+    """phases: list of (name, duration_sec, energy_kwh_or_None).
 
-    Disegna un'unica figura con due pannelli affiancati (tempo | energia),
-    che condividono lo stesso asse y -- le etichette delle fasi compaiono
-    una sola volta, sul pannello di sinistra.
+    Draws a single figure with two side-by-side panels (time | energy)
+    that share the same y axis -- phase labels appear only once, on the
+    left panel.
     """
     labels = [p[0] for p in phases]
     durations = [p[1] for p in phases]
@@ -84,8 +79,12 @@ def plot_pipeline_dual(phases, title, out_path, log_scale=False):
     _draw_panel(ax_energy, labels, energies_wh, energies, durations,
                 "Energia (Wh)", log_scale, show_power_label=True)
 
-    ax_time.invert_yaxis()  # una sola volta: ax_energy condivide lo stesso asse y
-    ax_energy.tick_params(labelleft=False)  # niente etichette duplicate a destra
+    # Called ONCE, on ax_time only: since ax_time and ax_energy share the
+    # same y axis (sharey=True), calling invert_yaxis() on BOTH would
+    # cancel out (the second call flips it back), silently undoing the
+    # first one.
+    ax_time.invert_yaxis()
+    ax_energy.tick_params(labelleft=False)  # no duplicated labels on the right
 
     fig.suptitle(title, fontsize=15)
     plt.tight_layout()
@@ -97,7 +96,7 @@ def plot_pipeline_dual(phases, title, out_path, log_scale=False):
 def main():
     os.makedirs(REPORT_DIR, exist_ok=True)
 
-    # --- Pipeline live (sessione di 10 secondi) ---
+    # --- Live pipeline (10-second session) ---
     webcam_record = get_latest("webcam_capture")
     pose_record = get_latest("pose_estimation_mmpose")
     single_video_record = get_latest("single_video_pipeline")
@@ -118,10 +117,12 @@ def main():
         print("Nessun dato per la pipeline live -- esegui prima i benchmark "
               "(webcam_capture, pose_estimation_mmpose, single_video_pipeline).")
 
-    # --- Pipeline di training (sull'intero dataset) ---
+    # --- Training pipeline (on the whole dataset) ---
     training_record = get_latest("whole_video")
     phases_training = []
 
+    # Keypoint extraction: ESTIMATED by linear extrapolation from the
+    # single-video benchmark, not measured directly.
     if pose_record:
         scale_factor = TRAINING_DATASET_DURATION_SEC / SINGLE_VIDEO_DURATION_SEC
         estimated_duration = pose_record["duration_sec"] * scale_factor

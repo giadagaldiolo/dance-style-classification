@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-#FILE = "annotations/keypoints2d/gWA_sBM_cAll_d25_mWA0_ch02.pkl"
 FILE = "outputs/keypoints/gJS_yt_04.pkl"
 
 CAMERA = 0
@@ -67,10 +66,10 @@ def normalize_keypoints(keypoints):
 
     l_ankle = kp[:, LEFT_ANKLE, :2]
     r_ankle = kp[:, RIGHT_ANKLE, :2]
-    
+
     dist_l = np.linalg.norm(nose - l_ankle, axis=1)
     dist_r = np.linalg.norm(nose - r_ankle, axis=1)
-    
+
     valid_distances = np.concatenate([dist_l[~np.isnan(dist_l)], dist_r[~np.isnan(dist_r)]])
 
     if len(valid_distances) == 0:
@@ -84,6 +83,8 @@ def normalize_keypoints(keypoints):
 
 
 def forearm_angle(keypoints, shoulder_id, elbow_id, wrist_id, side):
+    """Computes, for every frame, the elbow angle (degrees, 0-360)
+    between the upper arm and the forearm."""
     shoulder = keypoints[:, shoulder_id, :2]
     elbow = keypoints[:, elbow_id, :2]
     wrist = keypoints[:, wrist_id, :2]
@@ -95,17 +96,20 @@ def forearm_angle(keypoints, shoulder_id, elbow_id, wrist_id, side):
         np.arctan2(upper_arm[:, 1], upper_arm[:, 0])
     )
 
-    forearm_angle = np.degrees(
+    forearm_angle_deg = np.degrees(
         np.arctan2(forearm[:, 1], forearm[:, 0])
     )
 
     if side == "left":
-        angle = (forearm_angle - upper_angle + 360) % 360
+        angle = (forearm_angle_deg - upper_angle + 360) % 360
 
     elif side == "right":
-        angle = (upper_angle - forearm_angle + 360) % 360
+        angle = (upper_angle - forearm_angle_deg + 360) % 360
 
-   
+    else:
+        raise ValueError("side must be 'left' or 'right'")
+
+
     invalid = (
         np.isnan(upper_arm[:, 0]) |
         np.isnan(upper_arm[:, 1]) |
@@ -119,6 +123,9 @@ def forearm_angle(keypoints, shoulder_id, elbow_id, wrist_id, side):
 
 
 def compute_angle_arc(elbow, shoulder, angle_value, side, radius):
+    """Same geometry as utils_for_plots.py's compute_angle_arc, just
+    with parameter names specific to the elbow/shoulder case instead of
+    the more generic vertex/reference used there."""
     if np.isnan(angle_value):
         return [], []
 
@@ -181,6 +188,7 @@ def main():
     x_all = keypoints[:, :, 0]
     y_all = keypoints[:, :, 1]
 
+
     xmin = np.nanmin(x_all) - 0.2
     xmax = np.nanmax(x_all) + 0.2
     ymin = np.nanmin(y_all) - 0.2
@@ -218,12 +226,14 @@ def main():
     left_arc, = ax.plot(
         [],
         [],
+        color="teal",
         linewidth=2
     )
 
     right_arc, = ax.plot(
         [],
         [],
+        color="darkorange",
         linewidth=2,
     )
 

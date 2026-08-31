@@ -14,3 +14,5 @@ music/
 venv/
 __pycache__/
 *.pyc
+
+src/eliminabili/

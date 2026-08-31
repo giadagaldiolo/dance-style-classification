@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-#FILE = "annotations/keypoints2d/gJB_sFM_cAll_d07_mJB3_ch04.pkl"
+
 FILE = "outputs/keypoints/gJS_yt_04.pkl"
 
 CAMERA = 0
@@ -40,6 +40,8 @@ def load_data(path):
 
 
 def main():
+    """Animates keypoints in their RAW pixel space (no normalization),
+    directly over the video's own resolution"""
     data = load_data(FILE)
 
     keypoints = data["keypoints2d"][CAMERA]  # (T, 17, 3)
@@ -52,6 +54,9 @@ def main():
     fig, ax = plt.subplots(figsize=(6, 6))
 
     ax.set_xlim(0, W)
+    # Inverted y axis (H at the bottom, 0 at the top): image/video pixel
+    # coordinates have y increasing DOWNWARD, so this keeps the skeleton
+    # oriented the same way as the original footage instead of upside down.
     ax.set_ylim(H, 0)
     ax.set_aspect("equal")
     ax.set_xticks(np.arange(0, W + 1, 200))
@@ -67,7 +72,6 @@ def main():
             color=np.array(_COLORS[i]) / 255.0
         )
         points.append(point)
-
 
     lines = []
 

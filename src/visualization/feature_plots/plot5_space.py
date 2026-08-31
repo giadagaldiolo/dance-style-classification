@@ -3,12 +3,11 @@ import sys
 
 import numpy as np
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from visualization.feature_plots.utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
-
-SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
+
+from visualization.feature_plots.utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
 from classification.lma_extractor import normalize_keypoints, LEFT_HIP, RIGHT_HIP
 
 
@@ -25,13 +24,13 @@ def main():
     hip_center_x = (x[:, LEFT_HIP] + x[:, RIGHT_HIP]) / 2
     hip_center_y = (y[:, LEFT_HIP] + y[:, RIGHT_HIP]) / 2
 
-    k = int(fps)  # 1 secondo, stessa definizione usata in extract_features
+    k = int(fps)  # 1 second, same definition used in extract_features
 
-    # Stesso calcolo di extract_features: per ciascun frame, distanza tra
-    # la posizione del centro del bacino ora e quella un secondo prima.
-    # dist_1sec ha (n_frames - k) valori; lo riallineo alla timeline
-    # completa anteponendo dei NaN per il primo secondo, dove la feature
-    # non è ancora calcolabile (serve un secondo di "storia" per averla).
+    # Same calculation as extract_features: for each frame, distance
+    # between the hip center's position now and its position one second
+    # earlier. dist_1sec has (n_frames - k) values; realigned to the
+    # full timeline by prepending NaNs for the first second, where the
+    # feature isn't computable yet (needs one second of "history" first).
     dx = hip_center_x[k:] - hip_center_x[:-k]
     dy = hip_center_y[k:] - hip_center_y[:-k]
     dist_1sec = np.sqrt(dx**2 + dy**2)

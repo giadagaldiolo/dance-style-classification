@@ -11,16 +11,17 @@ from sustainability_tracker import _load_records, LOG_PATH
 REPORT_DIR = "outputs/sustainability"
 os.makedirs(REPORT_DIR, exist_ok=True)
 
-# Solo questi due esperimenti in questo report -- altre etichette nel log
-# (es. webcam_capture, pose_estimation_mmpose, usate per il grafico di
-# composizione della pipeline) non c'entrano con questo confronto.
+
 RELEVANT_LABELS = ["whole_video", "segments"]
 
 
 def build_dataframe():
+    """Flattens every logged experiment record (across all labels) into
+    a single DataFrame, one row per run -- metadata fields (e.g.
+    accuracy, extraction_pct) become their own columns."""
     records = _load_records()
     if not records:
-        raise RuntimeError(f"Nessun esperimento registrato in {LOG_PATH}")
+        raise RuntimeError(f"Any records found in {LOG_PATH}")
 
     rows = []
     for r in records:
@@ -37,6 +38,8 @@ def build_dataframe():
 
 
 def plot_metric(ax, latest, col, title):
+    """Simple bar chart of one metric (time, energy, or CO2) across the
+    compared labels"""
     if col in latest.columns and latest[col].notna().any():
         ax.bar(latest["label"], latest[col])
         ax.set_title(title)
@@ -44,16 +47,14 @@ def plot_metric(ax, latest, col, title):
             tick_label.set_rotation(25)
             tick_label.set_ha("right")
     else:
-        ax.set_title(f"{title}\n(dati non disponibili)")
+        ax.set_title(f"{title}\n(data not available)")
 
 
 def plot_scatter(ax, latest):
-    """Scatter Energia (x) vs Accuratezza (y). Linee di riferimento sottili
-    per orientare la lettura a quadranti (alto-sx = ideale), SENZA sfondo
-    colorato."""
+    """Scatter plot of Energy (x) vs. Accuracy (y). """
     valid = latest.dropna(subset=["energy_wh", "accuracy"])
     if len(valid) == 0:
-        ax.set_title("Energia vs accuratezza\n(dati non disponibili)")
+        ax.set_title("Energia vs accuratezza\n(data not available)")
         ax.axis("off")
         return
 
@@ -78,10 +79,16 @@ def plot_scatter(ax, latest):
 def main():
     df = build_dataframe()
 
+    # Saves the FULL, unfiltered history (every label ever logged) as a
+    # raw reference table -- separate from the focused comparison plot
+    # below, which only shows whole_video vs. segments.
     csv_path = os.path.join(REPORT_DIR, "report_table.csv")
     df.to_csv(csv_path, index=False)
     print(f"\nTabella completa salvata -> {csv_path}")
 
+    # Keeps only the LAST run for each label (in case an experiment was
+    # re-run multiple times), then narrows down to the two labels this
+    # comparison actually cares about.
     latest = df.drop_duplicates(subset="label", keep="last")
     latest = latest[latest["label"].isin(RELEVANT_LABELS)]
 
@@ -100,17 +107,17 @@ def main():
     fig = plt.figure(figsize=(4 * n_cols, 8))
     gs = gridspec.GridSpec(2, n_cols, figure=fig)
 
-    # Riga 1: invariata, 3 pannelli separati
+    # Row 1: 3 separate panels (time / energy / CO2).
     for i, (col, title) in enumerate(metrics_row1):
         ax = fig.add_subplot(gs[0, i])
         plot_metric(ax, latest, col, title)
 
-    # Riga 2: un solo pannello a piena larghezza -- lo scatter richiesto dal relatore
+    # Row 2: single full-width panel for the scatter plot 
     ax_scatter = fig.add_subplot(gs[1, :])
     if has_accuracy:
         plot_scatter(ax_scatter, latest)
     else:
-        ax_scatter.set_title("Energia vs accuratezza\n(dati non disponibili)")
+        ax_scatter.set_title("Energia vs accuratezza\n(data not available)")
         ax_scatter.axis("off")
 
     plt.tight_layout()

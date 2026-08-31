@@ -4,7 +4,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-# FILE = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
 FILE = "outputs/keypoints/gJB_yt_02.pkl"
 
 OUTPUT_DIR = "outputs/trajectories"
@@ -14,8 +13,8 @@ base_name = os.path.splitext(os.path.basename(FILE))[0]
 OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
 
 CAMERA = 0
-ID = 10
-TRAIL_LENGTH = 30
+ID = 10  # RIGHT_WRIST, the joint whose trajectory is traced
+TRAIL_LENGTH = 30  # how many past frames the red trail keeps showing
 
 _COLORS = [
     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0],
@@ -101,8 +100,8 @@ def main():
 
     title = ax.set_title("Frame 0")
 
-    traj_x = []
-    traj_y = []
+
+    trail = []
 
     def init():
 
@@ -112,6 +111,7 @@ def main():
         for line in lines:
             line.set_data([], [])
 
+        trail.clear()
         trajectory.set_data([], [])
         current_artist.set_offsets(np.empty((0, 2)))
 
@@ -153,19 +153,18 @@ def main():
                 )
 
         if not np.isnan(x[ID]) and not np.isnan(y[ID]):
+            trail.append((frame, x[ID], y[ID]))
 
-            traj_x.append(x[ID])
-            traj_y.append(y[ID])
+        while trail and frame - trail[0][0] >= TRAIL_LENGTH:
+            trail.pop(0)
 
-            if len(traj_x) > TRAIL_LENGTH:
-                traj_x.pop(0)
-                traj_y.pop(0)
-
-        trajectory.set_data(traj_x, traj_y)
-
-        if len(traj_x) > 0:
+        if trail:
+            traj_x = [p[1] for p in trail]
+            traj_y = [p[2] for p in trail]
+            trajectory.set_data(traj_x, traj_y)
             current_artist.set_offsets([[traj_x[-1], traj_y[-1]]])
         else:
+            trajectory.set_data([], [])
             current_artist.set_offsets(np.empty((0, 2)))
 
         title.set_text(f"Frame {frame}")

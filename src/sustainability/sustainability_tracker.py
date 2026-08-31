@@ -1,26 +1,25 @@
 """
-Sustainability Tracker: strumento riutilizzabile per monitorare tempo,
-energia e CO2 stimata di esperimenti di machine learning, con uno storico
-persistente su cui costruire confronti nel tempo (non un singolo
-risultato usa-e-getta).
+Sustainability Tracker: reusable tool for monitoring the time, energy,
+and estimated CO2 of machine learning experiments, with a persistent
+history to build comparisons over time.
 
-Nato per confrontare il costo computazionale di due approcci diversi
-all'interno di questa tesi (Random Forest per la classificazione, VAE per
-la generazione), ma pensato per essere riutilizzabile su qualunque
-progetto ML, non solo su questi due modelli.
+Built to compare the computational cost of different methodological
+choices within this thesis (e.g. whole-video vs. segment-based
+classification with a Random Forest), but designed to be reusable on any
+ML project, not tied to a specific model.
 
-Uso base:
+Basic usage:
     from sustainability_tracker import track
 
     with track("training_random_forest", metadata={"model": "RandomForest"}):
         pipeline.fit(X_train, y_train)
 
-Aggiungere metriche calcolate DOPO il training (es. accuratezza sul test
-set) a un run già registrato:
+Adding metrics computed AFTER training (e.g. test set accuracy) to an
+already-recorded run:
     from sustainability_tracker import log_metric
     log_metric("training_random_forest", accuracy=0.90)
 
-Installazione (opzionale ma consigliata, per energia/CO2 oltre al tempo):
+Installation:
     pip install codecarbon
 """
 
@@ -30,12 +29,7 @@ import json
 import time
 from contextlib import contextmanager
 from datetime import datetime
-
-try:
-    from codecarbon import EmissionsTracker
-    _HAS_CODECARBON = True
-except ImportError:
-    _HAS_CODECARBON = False
+from codecarbon import EmissionsTracker
 
 LOG_PATH = "outputs/sustainability/experiments_log.jsonl"
 CODECARBON_DETAILS_DIR = "outputs/sustainability/codecarbon_details"
@@ -46,6 +40,9 @@ def _ensure_log_dir():
 
 
 def _append_record(record):
+    """Appends one JSON record per line (JSONL format) -- each call to
+    track() adds a new line, the file is never overwritten, so history
+    accumulates across every run of every script."""
     _ensure_log_dir()
     with open(LOG_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -64,14 +61,14 @@ def _load_records():
 
 
 def get_file_size_mb(path):
-    """Comodo per loggare la dimensione di un modello salvato su disco."""
+    """Handy for logging the size of a model saved to disk."""
     return round(os.path.getsize(path) / (1024 * 1024), 3) if os.path.exists(path) else None
 
 
 def get_last_tracked_energy_kwh(label):
-    """Ritorna l'energia (kWh) dell'ultimo record salvato con quella
-    etichetta, o None se non trovato/non misurata. Utile per stimare
-    l'energia di fasi non tracciate direttamente (vedi
+    """Returns the energy (kWh) of the last record saved with that
+    label, or None if not found / not measured. Useful for estimating
+    the energy of phases that aren't tracked directly (see
     evaluation_energy_estimated_kwh in 8.train_lma_pipeline.py)."""
     records = [r for r in _load_records() if r["label"] == label]
     if not records:
@@ -80,9 +77,9 @@ def get_last_tracked_energy_kwh(label):
 
 
 def _read_last_energy_from_csv(csv_path):
-    """Legge l'energia consumata (kWh) dall'ultima riga scritta da
-    codecarbon nel suo file emissions.csv. Piu' robusto di leggere
-    attributi interni dell'oggetto EmissionsTracker."""
+    """Reads the energy consumed (kWh) from the last row written by
+    codecarbon in its emissions.csv file. More robust than relying on
+    internal attributes of the EmissionsTracker object."""
     if not os.path.exists(csv_path):
         return None
     try:
@@ -97,9 +94,9 @@ def _read_last_energy_from_csv(csv_path):
 
 
 def _read_hardware_breakdown_from_csv(csv_path):
-    """Legge dall'ultima riga del CSV di codecarbon la scomposizione
-    dell'energia per componente hardware (CPU, GPU, RAM), in kWh -- dato
-    gia' presente nel file, semplicemente non ancora esposto nel log."""
+    """Reads, from the last row of codecarbon's CSV, the energy
+    breakdown by hardware component (CPU, GPU, RAM), in kWh -- data
+    already present in the file, simply not yet exposed in the log. """
     if not os.path.exists(csv_path):
         return {}
     try:
@@ -122,32 +119,35 @@ def _read_hardware_breakdown_from_csv(csv_path):
 @contextmanager
 def track(label, metadata=None):
     """
-    Misura un blocco di codice (tipicamente il training di un modello) e
-    salva un record persistente in LOG_PATH: ogni chiamata si AGGIUNGE
-    allo storico, non lo sovrascrive, cosi' col tempo si accumula un
-    confronto tra piu' esperimenti, non solo l'ultimo.
+    Measures a block of code and saves a
+    persistent record to LOG_PATH: each call APPENDS to the history
+    instead of overwriting it, so a comparison across multiple
+    experiments accumulates over time, not just the latest one.
 
-    metadata: dict opzionale con informazioni note SUBITO (es. tipo di
-    modello, iperparametri). Metriche note solo dopo (es. accuratezza sul
-    test set) si aggiungono con log_metric().
-    """
+    metadata: optional dict with information already known UP FRONT
+    (e.g. model type, hyperparameters). Metrics only known afterwards
+    (e.g. test set accuracy) are added with log_metric().
+
+    If the wrapped code raises an exception, the "finally" block below
+    still runs and a record is still logged (with whatever time/energy
+    was measured up to that point) before the exception propagates """
     print(f"\n[TRACKER] Inizio: {label}")
 
     tracker = None
-    if _HAS_CODECARBON:
-        os.makedirs(CODECARBON_DETAILS_DIR, exist_ok=True)
-        tracker = EmissionsTracker(
-            project_name=label,
-            output_dir=CODECARBON_DETAILS_DIR,
-            output_file="emissions.csv",
-            log_level="error",
-            measure_power_secs=1,  # <-- il default e' 15s: un training rapido
-                                    # come un Random Forest finisce prima che
-                                    # codecarbon riesca a fare anche una sola
-                                    # misura, risultando in dati vuoti
-        )
-        tracker.start()
+    os.makedirs(CODECARBON_DETAILS_DIR, exist_ok=True)
+    tracker = EmissionsTracker(
+        project_name=label,
+        output_dir=CODECARBON_DETAILS_DIR,
+        output_file="emissions.csv",
+        log_level="error",
+        measure_power_secs=1,  # default is 15s: a fast training run
+                                # like a Random Forest finishes before
+                                # codecarbon can take even a single
+                                # measurement, resulting in empty data
+    )
+    tracker.start()
 
+    
     t0 = time.time()
 
     try:
@@ -159,19 +159,15 @@ def track(label, metadata=None):
 
         if tracker is not None:
             co2_kg = tracker.stop()
-            # Rilegge dal CSV che codecarbon stesso scrive, invece di
-            # affidarsi ad attributi interni dell'oggetto (che possono non
-            # esistere o cambiare nome tra versioni della libreria).
+            # Re-reads from the CSV that codecarbon itself writes,
+            # instead of relying on internal attributes of the object
             csv_path = os.path.join(CODECARBON_DETAILS_DIR, "emissions.csv")
             energy_kwh = _read_last_energy_from_csv(csv_path)
             hardware_breakdown = _read_hardware_breakdown_from_csv(csv_path)
 
             if co2_kg is None or energy_kwh is None:
                 print("[TRACKER] ATTENZIONE: codecarbon non ha misurato energia/CO2 "
-                      "per questo run. Se il training e' durato meno di 1-2 secondi "
-                      "potrebbe non bastare nemmeno measure_power_secs=1: prova ad "
-                      "aumentare artificialmente il carico (es. cross-validation, "
-                      "piu' run ripetuti) solo per la misurazione.")
+                      "per questo run. Se il training e' durato meno di 1-2 secondi")
         else:
             hardware_breakdown = {}
 
@@ -194,12 +190,10 @@ def track(label, metadata=None):
 
 
 def log_metric(label, **metrics):
-    """
-    Aggiunge metriche calcolate dopo il training (es. accuracy=0.9,
-    model_size_mb=1.2) all'ULTIMO record salvato con quel label, cosi' nel
-    report si possono confrontare non solo i costi ma anche "costo per
-    risultato ottenuto".
-    """
+    """Adds metrics computed after training (e.g. accuracy=0.9,
+    model_size_mb=1.2) to the LAST record saved with that label, so the
+    report can compare not just costs but also "cost per unit of result
+    achieved"."""
     records = _load_records()
     updated = False
     for record in reversed(records):
@@ -213,6 +207,7 @@ def log_metric(label, **metrics):
               f"esegui prima track('{label}') almeno una volta.")
         return
 
+    # Rewrites the WHOLE log file with the updated record in place
     _ensure_log_dir()
     with open(LOG_PATH, "w", encoding="utf-8") as f:
         for record in records:

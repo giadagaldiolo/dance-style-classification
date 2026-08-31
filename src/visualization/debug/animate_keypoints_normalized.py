@@ -4,9 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-#FILE = "annotations/keypoints2d/gJB_sFM_cAll_d07_mJB3_ch04.pkl"
+
 FILE = "outputs/keypoints/live_20260820_134527.pkl"
-#FILE = "outputs/keypoints_live/live_20260820_134527.pkl"
 
 CAMERA = 0
 OUTPUT_DIR = "outputs/animations/normalized"
@@ -46,6 +45,10 @@ def load_data(path):
 
 
 def normalize_keypoints(keypoints):
+    """Same normalization as in lma_extractor.py (translation to hip
+    center + scaling by max nose-to-ankle distance), duplicated here
+    since this standalone debugging script doesn't import from the
+    classification package."""
     kp = keypoints.copy()
     hips_center = (kp[:, LEFT_HIP, :2] + kp[:, RIGHT_HIP, :2]) / 2
     valid_center = ~(np.isnan(hips_center[:, 0]) | np.isnan(hips_center[:, 1]))
@@ -61,10 +64,10 @@ def normalize_keypoints(keypoints):
 
     l_ankle = kp[:, LEFT_ANKLE, :2]
     r_ankle = kp[:, RIGHT_ANKLE, :2]
-    
+
     dist_l = np.linalg.norm(nose - l_ankle, axis=1)
     dist_r = np.linalg.norm(nose - r_ankle, axis=1)
-    
+
     valid_distances = np.concatenate([dist_l[~np.isnan(dist_l)], dist_r[~np.isnan(dist_r)]])
 
     if len(valid_distances) == 0:
@@ -75,6 +78,7 @@ def normalize_keypoints(keypoints):
         kp[:, :, :2] /= max_dist
 
     return kp
+
 
 def main():
     data = load_data(FILE)
@@ -87,6 +91,11 @@ def main():
 
     fig, ax = plt.subplots(figsize=(6, 6))
 
+    # NOTE: fixed axis range (-1.5 to 1.5), not computed from the actual
+    # data like in utils.py's plot_skeleton_with_timeseries. Works fine
+    # for typical poses, but a sequence with very wide arm movements
+    # (e.g. Waacking) could push a joint (a wrist, in particular) beyond
+    # this range, silently clipping it out of view with no warning.
     half_range = 1.5
     tick_step = 0.5
 

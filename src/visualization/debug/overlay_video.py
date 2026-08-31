@@ -18,7 +18,6 @@ OUTPUT_VIDEO = os.path.join(OUTPUT_DIR, base_name + ".mp4")
 CACHE_VIDEO = VIDEO_FILE.replace(".mp4", ".npy")
 
 CAMERA = 0
-ID = 10
 
 _COLORS = [
     [255, 0, 0], [255, 85, 0], [255, 170, 0], [255, 255, 0],
@@ -42,6 +41,9 @@ def load_data(path):
 
 
 def ffmpeg_video_read(video_path, fps, w, h):
+    """Decodes the whole video to raw RGB24 frames via an ffmpeg
+    subprocess pipe (ffmpeg-python), resampling to `fps` first so the
+    decoded frame rate matches the keypoints' own fps."""
     stream = ffmpeg.input(video_path)
     stream = ffmpeg.filter(stream, "fps", fps=fps, round="down")
     stream = ffmpeg.output(stream, "pipe:", format="rawvideo", pix_fmt="rgb24")
@@ -110,13 +112,6 @@ def main():
         )
         lines.append(line)
 
-    current_artist = ax.scatter(
-        [],
-        [],
-        s=180,
-        color="red"
-    )
-
     title = ax.set_title("Frame 0")
 
     def init():
@@ -128,7 +123,6 @@ def main():
         for line in lines:
             line.set_data([], [])
 
-        current_artist.set_offsets(np.empty((0, 2)))
         title.set_text("Frame 0")
 
         return (
@@ -138,11 +132,25 @@ def main():
         )
 
     def update(i):
+        # Looks up the video frame whose timestamp matches this
+        # keypoint's own timestamp, rather than assuming index i maps
+        # directly to video frame i -- a safety net in case the
+        # independently ffmpeg-decoded video ends up with a slightly
+        # different frame count than what MMPose originally processed.
         t = timestamps[i] / 1_000_000
         vf = int(t * FPS)
 
         if vf < 0 or vf >= len(video):
-            return init()
+            # Same clearing as init() (blank image, hidden skeleton),
+            # but keeping the correct current frame number in the
+            # title, instead of resetting it to "Frame 0".
+            image_artist.set_data(np.zeros((H, W, 3), dtype=np.uint8))
+            for point in points:
+                point.set_offsets(np.empty((0, 2)))
+            for line in lines:
+                line.set_data([], [])
+            title.set_text(f"Frame {i}")
+            return [image_artist] + points + lines
 
         frame = video[vf]
         image_artist.set_data(frame)
@@ -169,8 +177,6 @@ def main():
                     [x[a], x[b]],
                     [y[a], y[b]]
                 )
-
-       
 
         title.set_text(f"Frame {i}")
 

@@ -1,10 +1,9 @@
 """
-Benchmark ISOLATO: misura estrazione feature + classificazione su UN
-SINGOLO video (non l'intero dataset di training) -- serve per costruire
-il grafico "pipeline per una sessione live". Estrazione e classificazione
-sono misurate insieme nello stesso blocco track() perché, prese
-singolarmente, sono entrambe troppo brevi per una lettura energetica
-affidabile.
+ISOLATED benchmark: measures feature extraction + classification on a
+SINGLE video. used to build the
+"pipeline for one live session" chart. Extraction and classification are
+measured together in the same track() block because, taken individually,
+both are too short for a reliable energy reading.
 """
 
 import os
@@ -23,8 +22,10 @@ if SRC_DIR not in sys.path:
 
 from classification.lma_extractor import extract_features
 
-# <-- Usa lo STESSO video (o uno della stessa durata, ~10s) usato in
-#     benchmark_pose_estimation.py, cosi' i due grafici restano coerenti
+# Uses the SAME video (or one of the same ~10s duration) as
+# benchmark_pose_estimation.py, so the two charts stay consistent with
+# each other (same session, same duration, used across all three phases
+# shown in the "pipeline for one 10-second video" chart).
 VIDEO_KEYPOINTS_PKL = "outputs/keypoints_live/live_20260811_012422.pkl"
 MODEL_PATH = "outputs/classification/multiclass_classification.pkl"
 
@@ -35,6 +36,8 @@ CLASSES = [
 
 
 def main():
+    # Loading the pre-extracted keypoints and the pretrained model both
+    # happen BEFORE the tracked block 
     with open(VIDEO_KEYPOINTS_PKL, "rb") as f:
         data = pickle.load(f)
     keypoints = data["keypoints2d"][0]
@@ -44,12 +47,15 @@ def main():
 
     clf = joblib.load(MODEL_PATH)
 
+    # Only feature extraction + classification are measured 
     with track("single_video_pipeline", metadata={
         "approach": "estrazione feature + classificazione, un video",
         "video_duration_sec": round(duration_sec, 1),
     }):
         features = extract_features(keypoints, fps)
         df = pd.DataFrame([features])
+        # Aligns the feature columns to the exact order/names the model
+        # was trained on, same pattern used throughout the project.
         try:
             expected_cols = clf.feature_names_in_
         except AttributeError:

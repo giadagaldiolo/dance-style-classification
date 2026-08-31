@@ -43,7 +43,7 @@ def load_keypoints(pkl_path):
 
 
 def compute_angle_arc(vertex, reference, angle_value, side, radius=0.12):
-    """Punti (x, y) dell'arco che rappresenta visivamente un angolo."""
+    """(x, y) points of the arc that visually represents an angle."""
     if np.isnan(angle_value):
         return [], []
 
@@ -72,42 +72,28 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
                                    highlight_joints=None,
                                    angle_arcs=None,
                                    distance_lines=None,
-                                   displacement_line=None,
-                                   extra_curves=None,
-                                   playback_speed=1.0):
+                                   extra_curves=None):
     """
-    Disegna, fianco a fianco, lo scheletro animato (a sinistra) e una o
-    più feature nel tempo con un indicatore dell'istante corrente (a
-    destra).
+    Draws, side by side, the animated skeleton (left) and one or more
+    features over time with a current-instant marker (right).
 
-    Convenzione colori: la curva principale (feature_values) è
-    "darkorange" di default; se presente una seconda curva in
-    extra_curves senza colore esplicito, è "teal" di default -- così le
-    due curve sono sempre coerenti tra loro, in ogni script.
-
-    Parametri opzionali:
-    - feature_color: colore della curva principale (default "darkorange").
-    - hlines: lista di dict {"value", "label", "color"} per linee di
-      riferimento orizzontali semplici (es. una mediana).
-    - show_bounding_box: disegna il rettangolo che racchiude i 12 giunti
-      usati per le feature di Body/Shape.
-    - highlight_joints: lista di indici di giunti (0-16) da disegnare
-      più grandi e con un bordo nero, per evidenziarli.
-    - angle_arcs: lista di dict per disegnare l'arco di un angolo sullo
-      scheletro. Ogni dict: "vertex", "reference", "side", "values",
-      "color" (opzionale), "radius" (opzionale).
-    - distance_lines: lista di dict per disegnare un segmento tratteggiato
-      da un giunto al centro del bacino nello STESSO frame. Ogni dict:
-      "joint" (indice del giunto), "color".
-    - displacement_line: dict per disegnare un segmento tra la posizione
-      di un punto ORA e la sua posizione un certo numero di frame fa.
-      Chiavi: "track_x", "track_y", "lag_frames", "color" (opzionale).
-    - extra_curves: lista di dict per disegnare curve aggiuntive nel
-      pannello destro, oltre a `feature_values`. Ogni dict: "values"
-      (array T,), "label", "color" (default "teal" se assente).
-    - playback_speed: 1.0 = velocità normale, 0.5 = metà velocità (più
-      lento), non altera i calcoli, solo la velocità di riproduzione
-      del file salvato.
+    Optional parameters:
+    - feature_color: color of the main curve (default "darkorange").
+    - hlines: list of dicts {"value", "label", "color"} for simple
+      horizontal reference lines (e.g. a median).
+    - show_bounding_box: draws the rectangle enclosing the 12 joints
+      used for the Body/Shape features.
+    - highlight_joints: list of joint indices (0-16) to draw larger and
+      with a black border, to highlight them.
+    - angle_arcs: list of dicts to draw an angle's arc on the skeleton.
+      Each dict: "vertex", "reference", "side", "values",
+      "color" (optional), "radius" (optional).
+    - distance_lines: list of dicts to draw a dashed segment from a
+      joint to the hip center, in the SAME frame. Each dict:
+      "joint" (joint index), "color".
+    - extra_curves: list of dicts to draw additional curves in the
+      right-hand panel, besides `feature_values`. Each dict: "values"
+      (array T,), "label", "color" (defaults to "teal" if absent).
     """
     kp = normalize_keypoints(keypoints)
     x = kp[:, :, 0]
@@ -135,7 +121,7 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
     ax_skel.set_xticks(ticks)
     ax_skel.set_yticks(ticks)
 
-    # --- Punti dello scheletro, con evidenziazione opzionale ---
+    # --- Skeleton points, with optional highlighting ---
     highlight_joints = highlight_joints or []
     points = []
     for i in range(N_KEYPOINTS):
@@ -155,7 +141,7 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
         line, = ax_skel.plot([], [], color="black", linewidth=1, zorder=2)
         lines.append(line)
 
-    # --- Bounding box opzionale ---
+    # --- Optional bounding box ---
     bbox_patch = None
     bbox_min_x = bbox_max_x = bbox_min_y = bbox_max_y = None
     if show_bounding_box:
@@ -169,14 +155,14 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
                                 linewidth=1.5, linestyle="--", zorder=4)
         ax_skel.add_patch(bbox_patch)
 
-    # --- Archi degli angoli opzionali ---
+    # --- Optional angle arcs ---
     angle_arcs = angle_arcs or []
     arc_lines = []
     for spec in angle_arcs:
         line, = ax_skel.plot([], [], color=spec.get("color", "darkorange"), linewidth=2, zorder=5)
         arc_lines.append(line)
 
-    # --- Linee di distanza dal centro del bacino, opzionali ---
+    # --- Optional distance-from-hip-center lines ---
     distance_lines = distance_lines or []
     dist_lines = []
     for spec in distance_lines:
@@ -184,19 +170,7 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
                               linewidth=1.8, linestyle="--", zorder=5)
         dist_lines.append(line)
 
-    # --- Freccia di spostamento (posizione ora vs. N frame fa), opzionale ---
-    disp_arrow = None
-    if displacement_line is not None:
-        disp_arrow = FancyArrowPatch(
-            (0, 0), (0, 0),
-            color=displacement_line.get("color", "#C2185B"),
-            arrowstyle="-|>", mutation_scale=14,
-            linewidth=2.2, zorder=6,
-        )
-        disp_arrow.set_visible(False)
-        ax_skel.add_patch(disp_arrow)
-
-    # --- Pannello destro: feature nel tempo (una curva principale + eventuali extra) ---
+    # --- Right panel: feature(s) over time (one main curve + optional extras) ---
     ax_feat.set_title(title)
     time_axis = np.arange(n_frames) / fps
     ax_feat.plot(time_axis, feature_values, color=feature_color, lw=1.5,
@@ -227,12 +201,8 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
             line.set_data([], [])
         for line in dist_lines:
             line.set_data([], [])
-        if disp_arrow is not None:
-            disp_arrow.set_visible(False)
 
         artists = points + lines + arc_lines + dist_lines + [time_marker]
-        if disp_arrow is not None:
-            artists.append(disp_arrow)
         if bbox_patch is not None:
             bbox_patch.set_bounds(0, 0, 0, 0)
             artists.append(bbox_patch)
@@ -272,22 +242,9 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
             else:
                 line.set_data([frame_x[j], hcx], [frame_y[j], hcy])
 
-        if disp_arrow is not None:
-            lag = displacement_line["lag_frames"]
-            tx, ty = displacement_line["track_x"], displacement_line["track_y"]
-            if frame_idx < lag or np.isnan(tx[frame_idx - lag]) or np.isnan(tx[frame_idx]):
-                disp_arrow.set_visible(False)
-            else:
-                past = (tx[frame_idx - lag], ty[frame_idx - lag])
-                now = (tx[frame_idx], ty[frame_idx])
-                disp_arrow.set_positions(past, now)
-                disp_arrow.set_visible(True)
-
         time_marker.set_xdata([frame_idx / fps, frame_idx / fps])
 
         artists = points + lines + arc_lines + dist_lines + [time_marker]
-        if disp_arrow is not None:
-            artists.append(disp_arrow)
         if bbox_patch is not None:
             bx0, bx1 = bbox_min_x[frame_idx], bbox_max_x[frame_idx]
             by0, by1 = bbox_min_y[frame_idx], bbox_max_y[frame_idx]
@@ -308,6 +265,6 @@ def plot_skeleton_with_timeseries(keypoints, fps, feature_values, title, ylabel,
     )
 
     plt.tight_layout()
-    anim.save(out_path, writer="ffmpeg", fps=fps * playback_speed)
+    anim.save(out_path, writer="ffmpeg", fps=fps)
     plt.close(fig)
     print(f"salvata {out_path}")

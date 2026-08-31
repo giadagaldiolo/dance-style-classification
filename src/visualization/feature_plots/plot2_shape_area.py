@@ -3,12 +3,12 @@ import sys
 
 import numpy as np
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from visualization.feature_plots.utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
 
-SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
+
+from visualization.feature_plots.utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
 from classification.lma_extractor import normalize_keypoints, JOINTS
 
 

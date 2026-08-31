@@ -4,12 +4,12 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from visualization.feature_plots.utils_for_plots import load_keypoints
 
-SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
+
+from visualization.feature_plots.utils_for_plots import load_keypoints
 from classification.lma_extractor import (
     normalize_keypoints, joint_angle,
     LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_ELBOW, RIGHT_ELBOW, LEFT_WRIST, RIGHT_WRIST,
@@ -18,9 +18,8 @@ from classification.lma_extractor import (
 PKL_PATH = "annotations/keypoints2d/gBR_sBM_cAll_d04_mBR0_ch01.pkl"
 OUT_PATH = "outputs/feature_plots/plot3b_shape_angle_histogram.png"
 
-# Stesso intervallo e numero di bin usati davvero in angle_histogram()
-# dentro lma_extractor.py -- NON -180/180: joint_angle() applica un
-# modulo 360, quindi i valori sono sempre in [0, 360).
+# Same range and number of bins actually used in angle_histogram()
+# inside lma_extractor.py. values are always in [0, 360).
 N_BINS = 8
 ANGLE_RANGE = (0, 360)
 
@@ -43,7 +42,7 @@ def main():
 
     bin_centers = (edges[:-1] + edges[1:]) / 2
     bin_labels = [f"{int(edges[i])}-{int(edges[i+1])}°" for i in range(N_BINS)]
-    bar_h = (edges[1] - edges[0]) * 0.4  # spessore di ciascuna barra, per affiancare le due serie
+    bar_h = (edges[1] - edges[0]) * 0.4  # thickness of each bar, so the two series sit side by side
 
     fig, ax = plt.subplots(figsize=(6, 6.5))
 

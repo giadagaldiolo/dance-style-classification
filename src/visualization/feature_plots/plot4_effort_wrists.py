@@ -1,14 +1,14 @@
 import os
 import sys
+import warnings
 
 import numpy as np
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from visualization.feature_plots.utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
-
-SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if SRC_DIR not in sys.path:
     sys.path.append(SRC_DIR)
+
+from visualization.feature_plots.utils_for_plots import load_keypoints, plot_skeleton_with_timeseries
 from classification.lma_extractor import normalize_keypoints, get_speed_accel, RIGHT_WRIST, LEFT_WRIST
 
 
@@ -26,7 +26,12 @@ def main():
     right_wrist_speed, _ = get_speed_accel(x[:, RIGHT_WRIST], y[:, RIGHT_WRIST], fps)
     left_wrist_speed, _ = get_speed_accel(x[:, LEFT_WRIST], y[:, LEFT_WRIST], fps)
 
-    mean_speed_curve = np.nanmean(np.stack([left_wrist_speed, right_wrist_speed]), axis=0)
+    # Curve shown in the graph: per-frame mean of the two wrists,
+    # computed ONLY for visualization (a single, readable line). This is
+    # NOT the operation used for the real feature.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        mean_speed_curve = np.nanmean(np.stack([left_wrist_speed, right_wrist_speed]), axis=0)
 
     median_speed = np.nanmedian(np.concatenate([left_wrist_speed, right_wrist_speed]))
 
