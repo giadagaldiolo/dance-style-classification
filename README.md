@@ -84,5 +84,5 @@ The full report, including methodology, results, and discussion, is available at
 
 ## Author
 
-Giada Galdiolo — SUPSI, Computer Engineering, 2025/2026
-Supervisor: Alessandro Giusti 
+- Giada Galdiolo 
+- Supervisor: Alessandro Giusti 
